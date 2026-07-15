@@ -9,6 +9,31 @@ namespace {
 
 constexpr float kCoordScale = 32767.0f;
 
+struct Rgb {
+    std::uint8_t r, g, b;
+};
+
+// The standard ILDA default 64-colour palette, used to resolve indexed frames
+// when no explicit palette (format-2) section precedes them.
+const Rgb kDefaultPalette[64] = {
+    {0, 0, 0},       {255, 255, 255}, {255, 0, 0},     {255, 255, 0},
+    {0, 255, 0},     {0, 255, 255},   {0, 0, 255},     {255, 0, 255},
+    {255, 128, 128}, {255, 140, 128}, {255, 151, 128}, {255, 163, 128},
+    {255, 174, 128}, {255, 186, 128}, {255, 197, 128}, {255, 209, 128},
+    {255, 220, 128}, {255, 232, 128}, {255, 243, 128}, {255, 255, 128},
+    {243, 255, 128}, {232, 255, 128}, {220, 255, 128}, {209, 255, 128},
+    {197, 255, 128}, {186, 255, 128}, {174, 255, 128}, {163, 255, 128},
+    {151, 255, 128}, {140, 255, 128}, {128, 255, 128}, {128, 255, 140},
+    {128, 255, 151}, {128, 255, 163}, {128, 255, 174}, {128, 255, 186},
+    {128, 255, 197}, {128, 255, 209}, {128, 255, 220}, {128, 255, 232},
+    {128, 255, 243}, {128, 255, 255}, {128, 243, 255}, {128, 232, 255},
+    {128, 220, 255}, {128, 209, 255}, {128, 197, 255}, {128, 186, 255},
+    {128, 174, 255}, {128, 163, 255}, {128, 151, 255}, {128, 140, 255},
+    {128, 128, 255}, {140, 128, 255}, {151, 128, 255}, {163, 128, 255},
+    {174, 128, 255}, {186, 128, 255}, {197, 128, 255}, {209, 128, 255},
+    {220, 128, 255}, {232, 128, 255}, {243, 128, 255}, {255, 128, 255},
+};
+
 std::int16_t toInt16(float v) {
     float s = v * kCoordScale;
     if (s > 32767.0f) s = 32767.0f;
@@ -120,6 +145,10 @@ ParseResult readIlda(const std::vector<std::uint8_t>& bytes) {
     std::size_t pos = 0;
     bool sawAnyHeader = false;
 
+    // Current palette for indexed formats; starts as the ILDA default and is
+    // replaced by any format-2 palette section encountered.
+    std::vector<Rgb> palette(kDefaultPalette, kDefaultPalette + 64);
+
     while (pos + 32 <= n) {
         const std::uint8_t* h = bytes.data() + pos;
         if (!(h[0] == 'I' && h[1] == 'L' && h[2] == 'D' && h[3] == 'A')) {
@@ -140,11 +169,31 @@ ParseResult readIlda(const std::vector<std::uint8_t>& bytes) {
             return result;
         }
 
+        // Format 2 is a palette section (R,G,B triples), not a frame.
+        if (format == 2) {
+            if (pos + static_cast<std::size_t>(records) * 3 > n) {
+                result.ok = false;
+                result.error = "truncated ILDA palette section";
+                return result;
+            }
+            palette.clear();
+            palette.reserve(records);
+            for (std::uint16_t i = 0; i < records; ++i) {
+                const std::uint8_t* c = bytes.data() + pos;
+                palette.push_back(Rgb{c[0], c[1], c[2]});
+                pos += 3;
+            }
+            continue;
+        }
+
         std::size_t pointSize = 0;
         bool is3D = false;
+        bool indexed = false;
         switch (format) {
-            case 4: pointSize = 10; is3D = true; break;  // 3D true colour
-            case 5: pointSize = 8; is3D = false; break;  // 2D true colour
+            case 0: pointSize = 8; is3D = true; indexed = true; break;   // 3D indexed
+            case 1: pointSize = 6; is3D = false; indexed = true; break;  // 2D indexed
+            case 4: pointSize = 10; is3D = true; indexed = false; break; // 3D true colour
+            case 5: pointSize = 8; is3D = false; indexed = false; break; // 2D true colour
             default:
                 result.ok = false;
                 result.error = "unsupported ILDA format code " + std::to_string(format);
@@ -176,9 +225,19 @@ ParseResult readIlda(const std::vector<std::uint8_t>& bytes) {
             }
             const std::uint8_t status = *r++;
             p.blanked = (status & 0x40) != 0;
-            p.b = *r++;
-            p.g = *r++;
-            p.r = *r++;
+            if (indexed) {
+                const std::uint8_t index = *r++;
+                if (!palette.empty()) {
+                    const Rgb& c = palette[index < palette.size() ? index : palette.size() - 1];
+                    p.r = c.r;
+                    p.g = c.g;
+                    p.b = c.b;
+                }
+            } else {
+                p.b = *r++;
+                p.g = *r++;
+                p.r = *r++;
+            }
             frame.points.push_back(p);
             pos += pointSize;
         }
