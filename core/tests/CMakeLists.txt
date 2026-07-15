@@ -4,6 +4,7 @@ add_executable(redfox_core_tests
     test_ilda_file.cpp
     test_cue_playback.cpp
     test_midi.cpp
+    test_show_file.cpp
 )
 target_link_libraries(redfox_core_tests PRIVATE redfox_core Catch2::Catch2WithMain)
 
