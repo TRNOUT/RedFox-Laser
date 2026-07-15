@@ -16,9 +16,15 @@ RedFox-Laser is split into two processes for safety and responsiveness:
   heartbeat and frame-stall watchdog, a rotating safety-event log, and the laser
   output backends. If the UI stops sending its heartbeat (crash or hang), the
   engine blanks all outputs automatically.
-- **UI** (planned) — the editor, cue grid / timeline, and status panel, connected
-  to the engine over local IPC (shared-memory telemetry + a named-pipe command
-  channel, native Win32, no third-party IPC dependency).
+- **UI** (`redfox_ui`, Qt) — connects to the engine over local IPC (shared-memory
+  telemetry + a named-pipe command channel, native Win32, no third-party IPC
+  dependency). The initial window shows the live safety state and offers
+  Arm / Emergency-Stop / Clear controls; the editor, cue grid and timeline build
+  on top of this. Optional at build time (only built when Qt6 is found).
+
+The shared, hardware-independent `core` library holds the file formats (an ILDA
+`.ild` reader/writer covering all standard formats), the show/cue data model,
+and MIDI parsing + mapping.
 
 Laser output goes through a small `LaserOutput` interface with pluggable
 backends. Today there is a `MockLaserOutput` (for automated tests) and a backend
@@ -45,7 +51,20 @@ cmake -S . -B build
 cmake --build build
 ```
 
+The Qt UI is optional. To include it, install Qt 6 and point CMake at it:
+
+```
+cmake -S . -B build -DCMAKE_PREFIX_PATH=C:/path/to/Qt/6.x.x/msvc2022_64
+cmake --build build
+```
+
 ## Running
+
+The UI (start the engine too, see below):
+
+```
+build\ui\Debug\redfox_ui.exe
+```
 
 The engine (mock output):
 
