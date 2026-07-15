@@ -33,6 +33,13 @@ struct EngineTelemetry {
     std::atomic<std::uint32_t> safetyState{0};   // SafetyStateWire
     std::atomic<std::uint32_t> lastEventCode{0}; // last SafetyEventCode
 
+    // Audio-reactive features (updated by the engine's audio input).
+    std::atomic<float> audioLevel{0.0f};
+    std::atomic<float> audioBass{0.0f};
+    std::atomic<float> audioMid{0.0f};
+    std::atomic<float> audioHigh{0.0f};
+    std::atomic<std::uint64_t> beatCount{0};
+
     // Live preview of the current output frame, published with a seqlock: the
     // sequence is odd while the engine writes and even when stable, so the UI
     // can read a torn-free snapshot without a cross-process mutex.
@@ -81,7 +88,7 @@ inline std::size_t readPreview(const EngineTelemetry& t, PreviewPoint* out) {
     return 0;
 }
 
-inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v3";
+inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v4";
 inline constexpr std::size_t kTelemetrySharedMemorySize = sizeof(EngineTelemetry);
 
 } // namespace redfox::ipc

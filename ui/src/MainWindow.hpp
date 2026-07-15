@@ -40,6 +40,7 @@ private:
     QLabel* connectionLabel_ = nullptr;
     QLabel* stateLabel_ = nullptr;
     QLabel* framesLabel_ = nullptr;
+    QLabel* audioLabel_ = nullptr;
     QTimer* timer_ = nullptr;
     EditorWindow* editor_ = nullptr;
     PreviewWidget* preview_ = nullptr;

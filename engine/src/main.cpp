@@ -7,6 +7,7 @@
 #include "midi/MidiInput.hpp"
 #include "midi/MidiMap.hpp"
 #include "midi/MidiTypes.hpp"
+#include "audio/AudioInput.hpp"
 #include "show/Show.hpp"
 #include "ilda/IldaTypes.hpp"
 #include "ipc/TelemetryHost.hpp"
@@ -158,6 +159,21 @@ int main() {
             }
         });
 
+    // Audio-reactive input: publish the analysed features (and beat count) to
+    // telemetry so the UI can show them and (later) modulate effects.
+    redfox::engine::AudioInput audioInput;
+    audioInput.setFeaturesCallback(
+        [&telemetryHost](const redfox::audio::AudioFeatures& features, bool beat) {
+            auto& t = telemetryHost.telemetry();
+            t.audioLevel.store(features.level, std::memory_order_relaxed);
+            t.audioBass.store(features.bass, std::memory_order_relaxed);
+            t.audioMid.store(features.mid, std::memory_order_relaxed);
+            t.audioHigh.store(features.high, std::memory_order_relaxed);
+            if (beat) {
+                t.beatCount.fetch_add(1, std::memory_order_relaxed);
+            }
+        });
+
     redfox::ipc::CommandPipeServer commandServer(
         [&supervisor, &frameGenerator](redfox::ipc::CommandType type, std::uint32_t arg) {
             using redfox::ipc::CommandType;
@@ -193,6 +209,12 @@ int main() {
     } else {
         std::cout << "MIDI: no input device found (controls still work over IPC)."
                   << std::endl;
+    }
+
+    if (audioInput.start(/*loopback=*/true)) {
+        std::cout << "Audio: analysing system loopback." << std::endl;
+    } else {
+        std::cout << "Audio: could not open a capture device." << std::endl;
     }
 
     std::vector<redfox::output::OutputPoint> outputPoints;

@@ -49,10 +49,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     stateFont.setBold(true);
     stateLabel_->setFont(stateFont);
     framesLabel_ = new QLabel("Frames sent: 0", central);
+    audioLabel_ = new QLabel("Audio: —", central);
 
     layout->addWidget(connectionLabel_);
     layout->addWidget(stateLabel_);
     layout->addWidget(framesLabel_);
+    layout->addWidget(audioLabel_);
 
     preview_ = new PreviewWidget(central);
     layout->addWidget(preview_, 1);
@@ -138,9 +140,19 @@ void MainWindow::tick() {
         const std::size_t count =
             redfox::ipc::readPreview(telemetry_->telemetry(), previewBuffer_.data());
         preview_->setPoints(previewBuffer_.data(), count);
+
+        const auto& t = telemetry_->telemetry();
+        audioLabel_->setText(
+            QString("Audio  level %1  bass %2  mid %3  high %4   beats %5")
+                .arg(t.audioLevel.load(), 0, 'f', 2)
+                .arg(t.audioBass.load(), 0, 'f', 2)
+                .arg(t.audioMid.load(), 0, 'f', 2)
+                .arg(t.audioHigh.load(), 0, 'f', 2)
+                .arg(static_cast<qulonglong>(t.beatCount.load())));
     } else {
         stateLabel_->setText("Safety state: —");
         framesLabel_->setText("Frames sent: —");
+        audioLabel_->setText("Audio: —");
         preview_->setPoints(nullptr, 0);
     }
 }
