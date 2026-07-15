@@ -1,5 +1,7 @@
 #include "MainWindow.hpp"
 
+#include "EditorWindow.hpp"
+
 #include <QFont>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -84,6 +86,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
     layout->addWidget(stopCueButton);
 
+    auto* editorButton = new QPushButton("Open Vector Editor", central);
+    connect(editorButton, &QPushButton::clicked, this, &MainWindow::openEditor);
+    layout->addWidget(editorButton);
+
     setCentralWidget(central);
 
     connect(armButton, &QPushButton::clicked, this, &MainWindow::onArm);
@@ -127,6 +133,15 @@ void MainWindow::tick() {
         stateLabel_->setText("Safety state: —");
         framesLabel_->setText("Frames sent: —");
     }
+}
+
+void MainWindow::openEditor() {
+    if (!editor_) {
+        editor_ = new EditorWindow(this);
+    }
+    editor_->show();
+    editor_->raise();
+    editor_->activateWindow();
 }
 
 void MainWindow::onArm() {

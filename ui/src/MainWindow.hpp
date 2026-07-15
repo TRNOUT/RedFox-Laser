@@ -9,6 +9,7 @@
 
 class QLabel;
 class QTimer;
+class EditorWindow;
 
 // The main application window. It stands in front of the headless engine,
 // connecting to it over the existing shared-memory + named-pipe IPC: it shows
@@ -24,6 +25,7 @@ private slots:
     void onArm();
     void onEmergencyStop();
     void onClearEStop();
+    void openEditor();
     void tick();
 
 private:
@@ -36,6 +38,7 @@ private:
     QLabel* stateLabel_ = nullptr;
     QLabel* framesLabel_ = nullptr;
     QTimer* timer_ = nullptr;
+    EditorWindow* editor_ = nullptr;
 
     static constexpr int kCueButtonCount = 8;
 };
