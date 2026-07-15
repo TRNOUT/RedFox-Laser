@@ -17,6 +17,8 @@ add_executable(redfox_ui WIN32
     src/LaserCanvas.hpp
     src/EditorWindow.cpp
     src/EditorWindow.hpp
+    src/PreviewWidget.cpp
+    src/PreviewWidget.hpp
 )
 target_link_libraries(redfox_ui PRIVATE redfox_engine_core Qt6::Widgets)
 redfox_copy_bundled_libusb_dll(redfox_ui)

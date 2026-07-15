@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "EditorWindow.hpp"
+#include "PreviewWidget.hpp"
 
 #include <QFont>
 #include <QGridLayout>
@@ -52,6 +53,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     layout->addWidget(connectionLabel_);
     layout->addWidget(stateLabel_);
     layout->addWidget(framesLabel_);
+
+    preview_ = new PreviewWidget(central);
+    layout->addWidget(preview_, 1);
+    previewBuffer_.resize(redfox::ipc::kMaxPreviewPoints);
 
     auto* buttons = new QHBoxLayout();
     auto* armButton = new QPushButton("Arm", central);
@@ -129,9 +134,14 @@ void MainWindow::tick() {
         framesLabel_->setText(
             QString("Frames sent: %1")
                 .arg(static_cast<qulonglong>(telemetry_->telemetry().framesSent.load())));
+
+        const std::size_t count =
+            redfox::ipc::readPreview(telemetry_->telemetry(), previewBuffer_.data());
+        preview_->setPoints(previewBuffer_.data(), count);
     } else {
         stateLabel_->setText("Safety state: —");
         framesLabel_->setText("Frames sent: —");
+        preview_->setPoints(nullptr, 0);
     }
 }
 

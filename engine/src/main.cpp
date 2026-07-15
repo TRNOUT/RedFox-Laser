@@ -156,13 +156,6 @@ int main() {
                     break;
             }
         });
-    const std::string midiPort = midiInput.openFirstPort();
-    if (!midiPort.empty()) {
-        std::cout << "MIDI: listening on \"" << midiPort << "\"" << std::endl;
-    } else {
-        std::cout << "MIDI: no input device found (controls still work over IPC)."
-                  << std::endl;
-    }
 
     redfox::ipc::CommandPipeServer commandServer(
         [&supervisor, &frameGenerator](redfox::ipc::CommandType type, std::uint32_t arg) {
@@ -191,7 +184,18 @@ int main() {
 
     std::cout << "RedFox-Laser Engine running (mock output). Ctrl+C to stop." << std::endl;
 
+    // Open MIDI last: port enumeration can be slow on Windows, and we don't want
+    // it to delay the command/telemetry channels the UI connects to.
+    const std::string midiPort = midiInput.openFirstPort();
+    if (!midiPort.empty()) {
+        std::cout << "MIDI: listening on \"" << midiPort << "\"" << std::endl;
+    } else {
+        std::cout << "MIDI: no input device found (controls still work over IPC)."
+                  << std::endl;
+    }
+
     std::vector<redfox::output::OutputPoint> outputPoints;
+    std::vector<redfox::ipc::PreviewPoint> previewPoints;
     std::uint64_t lastSeenUiHeartbeat = 0;
     while (g_shouldRun.load()) {
         auto& telemetry = telemetryHost.telemetry();
@@ -206,13 +210,27 @@ int main() {
 
         // While armed with an active cue, render its current frame to the
         // output and keep the frame-stall watchdog satisfied.
+        bool produced = false;
         if (supervisor.state() == redfox::safety::SafetyState::Armed &&
             frameGenerator.hasActiveCue()) {
             if (frameGenerator.currentFrame(outputPoints)) {
                 mockOutput->sendFrame(outputPoints);
                 supervisor.notifyFrameProduced();
                 telemetry.framesSent.fetch_add(1, std::memory_order_relaxed);
+                produced = true;
             }
+        }
+
+        // Publish the current frame (or an empty one) for the UI preview.
+        if (produced) {
+            previewPoints.clear();
+            previewPoints.reserve(outputPoints.size());
+            for (const auto& p : outputPoints) {
+                previewPoints.push_back(redfox::ipc::PreviewPoint{p.x, p.y, p.r, p.g, p.b});
+            }
+            redfox::ipc::writePreview(telemetry, previewPoints.data(), previewPoints.size());
+        } else {
+            redfox::ipc::writePreview(telemetry, nullptr, 0);
         }
 
         telemetry.engineHeartbeatEpochMs.store(nowEpochMs());

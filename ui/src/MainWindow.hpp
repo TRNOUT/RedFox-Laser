@@ -3,13 +3,16 @@
 #include <QMainWindow>
 
 #include <memory>
+#include <vector>
 
 #include "ipc/CommandPipeClient.hpp"
+#include "ipc/SharedTelemetry.hpp"
 #include "ipc/TelemetryClient.hpp"
 
 class QLabel;
 class QTimer;
 class EditorWindow;
+class PreviewWidget;
 
 // The main application window. It stands in front of the headless engine,
 // connecting to it over the existing shared-memory + named-pipe IPC: it shows
@@ -39,6 +42,8 @@ private:
     QLabel* framesLabel_ = nullptr;
     QTimer* timer_ = nullptr;
     EditorWindow* editor_ = nullptr;
+    PreviewWidget* preview_ = nullptr;
+    std::vector<redfox::ipc::PreviewPoint> previewBuffer_;
 
     static constexpr int kCueButtonCount = 8;
 };
