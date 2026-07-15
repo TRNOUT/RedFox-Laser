@@ -1,5 +1,6 @@
 #include "TimelineEditor.hpp"
 
+#include "EditorWindow.hpp"
 #include "TimelineRuler.hpp"
 
 #include <QCheckBox>
@@ -44,9 +45,11 @@ TimelineEditor::TimelineEditor(QWidget* parent)
     cueLayout->addWidget(cueList_, 1);
 
     auto* cueSide = new QVBoxLayout();
+    auto* drawButton = new QPushButton("Draw New Cue…", cueGroup);
     auto* importButton = new QPushButton("Import .ild as Cue", cueGroup);
     auto* renameButton = new QPushButton("Rename", cueGroup);
     auto* deleteButton = new QPushButton("Delete", cueGroup);
+    cueSide->addWidget(drawButton);
     cueSide->addWidget(importButton);
     cueSide->addWidget(renameButton);
     cueSide->addWidget(deleteButton);
@@ -111,6 +114,7 @@ TimelineEditor::TimelineEditor(QWidget* parent)
     connect(reloadButton, &QPushButton::clicked, this, &TimelineEditor::reload);
     connect(saveButton, &QPushButton::clicked, this, &TimelineEditor::save);
 
+    connect(drawButton, &QPushButton::clicked, this, &TimelineEditor::drawNewCue);
     connect(importButton, &QPushButton::clicked, this, &TimelineEditor::importCue);
     connect(renameButton, &QPushButton::clicked, this, &TimelineEditor::renameCue);
     connect(deleteButton, &QPushButton::clicked, this, &TimelineEditor::deleteCue);
@@ -228,11 +232,13 @@ void TimelineEditor::importCue() {
         return;
     }
 
-    redfox::show::Cue cue;
-    cue.name = std::filesystem::path(path.toStdString()).stem().string();
-    if (cue.name.empty()) {
-        cue.name = "Imported";
+    std::string name = std::filesystem::path(path.toStdString()).stem().string();
+    if (name.empty()) {
+        name = "Imported";
     }
+    // An imported .ild may hold an animation; use all its frames.
+    redfox::show::Cue cue;
+    cue.name = name;
     cue.frames = parsed.frames;
 
     commitTableToShow(); // preserve current step edits before rebuilding
@@ -240,8 +246,48 @@ void TimelineEditor::importCue() {
     loadFromShow(show_);
     cueList_->setCurrentRow(static_cast<int>(show_.cues.size()) - 1);
     statusLabel_->setText(QString("Imported cue %1 (%2 frames).")
-                              .arg(QString::fromStdString(show_.cues.back().name))
+                              .arg(QString::fromStdString(name))
                               .arg(parsed.frames.size()));
+}
+
+void TimelineEditor::drawNewCue() {
+    if (!drawEditor_) {
+        drawEditor_ = new EditorWindow(this);
+        drawEditor_->enableAddAsCue();
+        // Each "Add as Cue" click turns the current drawing into a show cue.
+        connect(drawEditor_, &EditorWindow::frameReady, this,
+                [this](const redfox::ilda::IldaFrame& frame) {
+                    if (frame.points.empty()) {
+                        QMessageBox::information(this, "Empty frame",
+                                                 "Draw at least one point first.");
+                        return;
+                    }
+                    bool ok = false;
+                    const QString name = QInputDialog::getText(
+                        this, "New cue", "Cue name:", QLineEdit::Normal,
+                        QString("Cue %1").arg(show_.cues.size()), &ok);
+                    if (ok) {
+                        addCueFromFrame(frame, name.isEmpty() ? "Cue" : name.toStdString());
+                    }
+                });
+    }
+    drawEditor_->show();
+    drawEditor_->raise();
+    drawEditor_->activateWindow();
+}
+
+void TimelineEditor::addCueFromFrame(const redfox::ilda::IldaFrame& frame,
+                                     const std::string& name) {
+    redfox::show::Cue cue;
+    cue.name = name;
+    cue.frames = {frame};
+
+    commitTableToShow(); // preserve current step edits before rebuilding
+    show_.cues.push_back(std::move(cue));
+    loadFromShow(show_);
+    cueList_->setCurrentRow(static_cast<int>(show_.cues.size()) - 1);
+    statusLabel_->setText(QString("Added drawn cue %1.")
+                              .arg(QString::fromStdString(name)));
 }
 
 void TimelineEditor::renameCue() {

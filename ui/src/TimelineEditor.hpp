@@ -10,7 +10,10 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QTableWidget;
+class EditorWindow;
 class TimelineRuler;
+
+namespace redfox::ilda { struct IldaFrame; }
 
 // Authors a show's timeline: the sequence of {time, cue} steps the engine's
 // Sequencer plays back. It loads the shared show file (falling back to the
@@ -29,6 +32,7 @@ private slots:
     void save();
     void reload();
     void importCue();
+    void drawNewCue();
     void renameCue();
     void deleteCue();
     void onCueSelectionChanged();
@@ -40,6 +44,7 @@ private:
     void rebuildCueList();
     void refreshRuler();
     void commitTableToShow();  // fold the step table into show_.timeline (sorted)
+    void addCueFromFrame(const redfox::ilda::IldaFrame& frame, const std::string& name);
     int selectedCue() const;   // index into show_.cues, or -1
 
     redfox::show::Show show_;
@@ -54,5 +59,6 @@ private:
     TimelineRuler* ruler_ = nullptr;
     QTableWidget* table_ = nullptr;
     QLabel* statusLabel_ = nullptr;
+    EditorWindow* drawEditor_ = nullptr; // vector editor for drawing new cues
     bool updatingCueSettings_ = false; // guard against feedback while populating
 };

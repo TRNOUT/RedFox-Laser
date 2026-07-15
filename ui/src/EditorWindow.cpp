@@ -30,6 +30,8 @@ EditorWindow::EditorWindow(QWidget* parent) : QMainWindow(parent) {
     auto* clearButton = new QPushButton("Clear", central);
     auto* loadButton = new QPushButton("Load .ild", central);
     auto* saveButton = new QPushButton("Save .ild", central);
+    addAsCueButton_ = new QPushButton("Add as Cue", central);
+    addAsCueButton_->setVisible(false); // shown only when hosted by the timeline
     pointCountLabel_ = new QLabel("0 points", central);
 
     tools->addWidget(colorButton);
@@ -38,6 +40,7 @@ EditorWindow::EditorWindow(QWidget* parent) : QMainWindow(parent) {
     tools->addWidget(clearButton);
     tools->addWidget(loadButton);
     tools->addWidget(saveButton);
+    tools->addWidget(addAsCueButton_);
     tools->addStretch(1);
     tools->addWidget(pointCountLabel_);
     layout->addLayout(tools);
@@ -56,6 +59,12 @@ EditorWindow::EditorWindow(QWidget* parent) : QMainWindow(parent) {
     connect(canvas_, &LaserCanvas::pointCountChanged, this, [this](int count) {
         pointCountLabel_->setText(QString("%1 points").arg(count));
     });
+    connect(addAsCueButton_, &QPushButton::clicked, this,
+            [this]() { emit frameReady(canvas_->frame()); });
+}
+
+void EditorWindow::enableAddAsCue() {
+    addAsCueButton_->setVisible(true);
 }
 
 void EditorWindow::pickColor() {
