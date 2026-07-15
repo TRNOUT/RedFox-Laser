@@ -123,33 +123,37 @@ int main() {
         telemetryHost.telemetry().lastEventCode.store(static_cast<std::uint32_t>(code));
     });
 
-    // Load a show authored in the editor if one sits next to the engine,
-    // otherwise fall back to the built-in demo. The show carries its own
-    // timeline; a loaded show with no timeline just leaves the sequencer idle.
-    std::shared_ptr<const redfox::show::Show> show;
-    redfox::show::Timeline timeline;
-    const redfox::show::ShowParseResult loaded = redfox::show::readShowFile("show.rfsh");
-    if (loaded.ok && !loaded.show.cues.empty()) {
-        show = std::make_shared<redfox::show::Show>(loaded.show);
-        timeline = loaded.show.timeline;
-        std::cout << "Loaded show \"" << show->name << "\" (" << show->cues.size()
-                  << " cues, " << timeline.steps.size() << " timeline steps)." << std::endl;
-    } else {
-        auto demo = std::make_shared<redfox::show::Show>(redfox::show::makeDemoShow());
-        timeline = demo->timeline;
-        show = demo;
-        std::cout << "No show.rfsh found; using built-in demo show." << std::endl;
-    }
-
     redfox::engine::FrameGenerator frameGenerator(clock);
-    frameGenerator.setShow(show);
 
     // The sequencer auto-triggers cues from a timeline as time advances. It
     // drives the same FrameGenerator the manual cue buttons do.
     redfox::engine::Sequencer sequencer(clock);
-    sequencer.setTimeline(timeline);
     sequencer.setTriggerCallback(
         [&frameGenerator](std::size_t cueIndex) { frameGenerator.triggerCue(cueIndex); });
+
+    // Load the authored show from the shared well-known path (the editor saves
+    // there); fall back to the built-in demo. Reused by the ReloadShow command
+    // so an editor save can be picked up live without restarting the engine.
+    const std::string showPath = redfox::show::defaultShowFilePath();
+    const auto loadShowFromDisk = [&frameGenerator, &sequencer, &showPath]() {
+        const redfox::show::ShowParseResult loaded = redfox::show::readShowFile(showPath);
+        if (!loaded.ok || loaded.show.cues.empty()) {
+            return false;
+        }
+        auto show = std::make_shared<redfox::show::Show>(loaded.show);
+        frameGenerator.setShow(show);
+        sequencer.setTimeline(show->timeline);
+        std::cout << "Loaded show \"" << show->name << "\" (" << show->cues.size()
+                  << " cues, " << show->timeline.steps.size() << " timeline steps) from "
+                  << showPath << std::endl;
+        return true;
+    };
+    if (!loadShowFromDisk()) {
+        auto demo = std::make_shared<redfox::show::Show>(redfox::show::makeDemoShow());
+        frameGenerator.setShow(demo);
+        sequencer.setTimeline(demo->timeline);
+        std::cout << "No show at " << showPath << "; using built-in demo show." << std::endl;
+    }
 
     // MIDI input: pads (notes 36..43) trigger cues 0..7; note 44 arms, note 45
     // is a panic/blackout. Runs on libremidi's thread; the targets it calls
@@ -201,8 +205,8 @@ int main() {
         });
 
     redfox::ipc::CommandPipeServer commandServer(
-        [&supervisor, &frameGenerator, &sequencer](redfox::ipc::CommandType type,
-                                                   std::uint32_t arg) {
+        [&supervisor, &frameGenerator, &sequencer,
+         &loadShowFromDisk](redfox::ipc::CommandType type, std::uint32_t arg) {
             using redfox::ipc::CommandType;
             switch (type) {
                 case CommandType::Ping:
@@ -229,6 +233,13 @@ int main() {
                     break;
                 case CommandType::StopSequence:
                     sequencer.stop();
+                    break;
+                case CommandType::ReloadShow:
+                    if (!loadShowFromDisk()) {
+                        std::cout << "ReloadShow: no valid show on disk; keeping "
+                                     "the current one."
+                                  << std::endl;
+                    }
                     break;
             }
         });

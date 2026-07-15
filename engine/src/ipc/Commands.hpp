@@ -12,6 +12,7 @@ enum class CommandType : std::uint32_t {
     StopCue = 5,
     PlaySequence = 6, // start the loaded timeline from the beginning
     StopSequence = 7, // stop timeline playback
+    ReloadShow = 8,   // re-read the show file from disk (after an editor save)
 };
 
 struct CommandMessage {

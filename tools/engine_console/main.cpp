@@ -51,7 +51,7 @@ int main() {
     std::thread heartbeatThread(heartbeatLoop, std::ref(telemetry));
 
     std::cout << "Connected. Commands: arm, estop, clear, ping, cue <n>, "
-                 "stopcue, status, quit" << std::endl;
+                 "stopcue, play, stopseq, reload, status, quit" << std::endl;
 
     std::string line;
     while (g_running.load() && std::getline(std::cin, line)) {
@@ -73,6 +73,12 @@ int main() {
             }
         } else if (line == "stopcue") {
             commands.send(redfox::ipc::CommandType::StopCue);
+        } else if (line == "play") {
+            commands.send(redfox::ipc::CommandType::PlaySequence);
+        } else if (line == "stopseq") {
+            commands.send(redfox::ipc::CommandType::StopSequence);
+        } else if (line == "reload") {
+            commands.send(redfox::ipc::CommandType::ReloadShow);
         } else if (line == "status") {
             std::cout << "safetyState=" << telemetry.telemetry().safetyState.load()
                       << " framesSent=" << telemetry.telemetry().framesSent.load()

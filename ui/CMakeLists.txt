@@ -19,6 +19,8 @@ add_executable(redfox_ui WIN32
     src/EditorWindow.hpp
     src/TimelineEditor.cpp
     src/TimelineEditor.hpp
+    src/TimelineRuler.cpp
+    src/TimelineRuler.hpp
     src/PreviewWidget.cpp
     src/PreviewWidget.hpp
 )

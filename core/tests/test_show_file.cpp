@@ -102,6 +102,16 @@ TEST_CASE("a show round-trips through a file", "[show][file]") {
     std::filesystem::remove(path, ec);
 }
 
+TEST_CASE("the default show path is usable and ends in show.rfsh", "[show][file]") {
+    const std::string path = show::defaultShowFilePath();
+    REQUIRE_FALSE(path.empty());
+    REQUIRE(path.size() >= 9);
+    REQUIRE(path.substr(path.size() - 9) == "show.rfsh");
+    // Its directory must exist (created on demand) so a save can succeed.
+    const std::filesystem::path parent = std::filesystem::path(path).parent_path();
+    REQUIRE((parent.empty() || std::filesystem::exists(parent)));
+}
+
 TEST_CASE("garbage is rejected and a missing file fails cleanly", "[show][file]") {
     const std::vector<std::uint8_t> junk = {'x', 'y', 'z'};
     REQUIRE_FALSE(show::readShow(junk).ok);

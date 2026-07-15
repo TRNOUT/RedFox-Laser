@@ -24,4 +24,11 @@ ShowParseResult readShow(const std::vector<std::uint8_t>& bytes);
 bool writeShowFile(const std::string& path, const Show& show);
 ShowParseResult readShowFile(const std::string& path);
 
+// The well-known location engine and UI share for the current show
+// (%APPDATA%\RedFoxLaser\show.rfsh, directory created on demand). The two
+// processes may start from different working directories, so a fixed path is
+// what makes "save in the editor, engine picks it up" reliable. Falls back to
+// a working-directory-relative "show.rfsh" if APPDATA is unavailable.
+std::string defaultShowFilePath();
+
 } // namespace redfox::show

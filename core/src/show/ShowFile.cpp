@@ -2,7 +2,9 @@
 
 #include "ilda/IldaCodec.hpp"
 
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 
 namespace redfox::show {
@@ -228,6 +230,20 @@ bool writeShowFile(const std::string& path, const Show& show) {
     file.write(reinterpret_cast<const char*>(bytes.data()),
                static_cast<std::streamsize>(bytes.size()));
     return static_cast<bool>(file);
+}
+
+std::string defaultShowFilePath() {
+    const char* appData = std::getenv("APPDATA");
+    if (appData == nullptr || *appData == '\0') {
+        return "show.rfsh";
+    }
+    const std::filesystem::path dir = std::filesystem::path(appData) / "RedFoxLaser";
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        return "show.rfsh";
+    }
+    return (dir / "show.rfsh").string();
 }
 
 ShowParseResult readShowFile(const std::string& path) {
