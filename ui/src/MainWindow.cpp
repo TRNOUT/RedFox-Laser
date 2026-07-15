@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include <QFont>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -44,9 +45,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     stateFont.setPointSize(18);
     stateFont.setBold(true);
     stateLabel_->setFont(stateFont);
+    framesLabel_ = new QLabel("Frames sent: 0", central);
 
     layout->addWidget(connectionLabel_);
     layout->addWidget(stateLabel_);
+    layout->addWidget(framesLabel_);
 
     auto* buttons = new QHBoxLayout();
     auto* armButton = new QPushButton("Arm", central);
@@ -57,6 +60,29 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     buttons->addWidget(eStopButton);
     buttons->addWidget(clearButton);
     layout->addLayout(buttons);
+
+    // Cue grid: each button triggers the cue at that index in the loaded show.
+    layout->addWidget(new QLabel("Cues", central));
+    auto* cueGrid = new QGridLayout();
+    for (int i = 0; i < kCueButtonCount; ++i) {
+        auto* cueButton = new QPushButton(QString("Cue %1").arg(i), central);
+        connect(cueButton, &QPushButton::clicked, this, [this, i]() {
+            if (commands_ && commands_->isConnected()) {
+                commands_->send(redfox::ipc::CommandType::TriggerCue,
+                                static_cast<std::uint32_t>(i));
+            }
+        });
+        cueGrid->addWidget(cueButton, i / 4, i % 4);
+    }
+    layout->addLayout(cueGrid);
+
+    auto* stopCueButton = new QPushButton("Stop Cue", central);
+    connect(stopCueButton, &QPushButton::clicked, this, [this]() {
+        if (commands_ && commands_->isConnected()) {
+            commands_->send(redfox::ipc::CommandType::StopCue);
+        }
+    });
+    layout->addWidget(stopCueButton);
 
     setCentralWidget(central);
 
@@ -94,8 +120,12 @@ void MainWindow::tick() {
         telemetry_->telemetry().uiHeartbeatEpochMs.store(nowEpochMs());
         const std::uint32_t state = telemetry_->telemetry().safetyState.load();
         stateLabel_->setText(QString("Safety state: ") + stateName(state));
+        framesLabel_->setText(
+            QString("Frames sent: %1")
+                .arg(static_cast<qulonglong>(telemetry_->telemetry().framesSent.load())));
     } else {
         stateLabel_->setText("Safety state: —");
+        framesLabel_->setText("Frames sent: —");
     }
 }
 

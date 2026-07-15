@@ -34,5 +34,8 @@ private:
 
     QLabel* connectionLabel_ = nullptr;
     QLabel* stateLabel_ = nullptr;
+    QLabel* framesLabel_ = nullptr;
     QTimer* timer_ = nullptr;
+
+    static constexpr int kCueButtonCount = 8;
 };
