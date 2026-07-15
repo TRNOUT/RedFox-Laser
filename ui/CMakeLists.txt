@@ -17,6 +17,8 @@ add_executable(redfox_ui WIN32
     src/LaserCanvas.hpp
     src/EditorWindow.cpp
     src/EditorWindow.hpp
+    src/TimelineEditor.cpp
+    src/TimelineEditor.hpp
     src/PreviewWidget.cpp
     src/PreviewWidget.hpp
 )

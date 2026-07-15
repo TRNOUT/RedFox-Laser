@@ -5,6 +5,7 @@
 #include "output/MockLaserOutput.hpp"
 #include "playback/FrameGenerator.hpp"
 #include "playback/Sequencer.hpp"
+#include "show/DemoContent.hpp"
 #include "show/ShowFile.hpp"
 #include "show/Timeline.hpp"
 #include "midi/MidiInput.hpp"
@@ -57,56 +58,6 @@ std::uint64_t nowEpochMs() {
         duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
 }
 
-// A tiny built-in show so the playback path can be exercised end-to-end against
-// the mock output before real content loading exists.
-std::shared_ptr<const redfox::show::Show> makeDemoShow() {
-    using namespace redfox;
-    auto show = std::make_shared<show::Show>();
-    show->name = "Demo";
-
-    show::Cue square;
-    square.name = "Square";
-    ilda::IldaFrame squareFrame;
-    constexpr std::uint8_t kWhite = 255;
-    squareFrame.points = {
-        {-0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
-        {0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
-        {0.5f, 0.5f, 0.0f, kWhite, kWhite, kWhite, false},
-        {-0.5f, 0.5f, 0.0f, kWhite, kWhite, kWhite, false},
-        {-0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
-    };
-    square.frames = {squareFrame};
-    square.spinTurnsPerSec = 0.2f; // slowly rotating, to show effects in the preview
-    show->cues.push_back(square);
-
-    show::Cue blink;
-    blink.name = "Blink";
-    blink.framesPerSecond = 4.0f;
-    ilda::IldaFrame dotOn;
-    dotOn.points = {{0.0f, 0.0f, 0.0f, 255, 0, 0, false}};
-    ilda::IldaFrame dotOff;
-    dotOff.points = {{0.0f, 0.0f, 0.0f, 0, 0, 0, true}};
-    blink.frames = {dotOn, dotOff};
-    show->cues.push_back(blink);
-
-    return show;
-}
-
-// A short demo sequence over the demo show's two cues, so the timeline/
-// sequencer path can be exercised end-to-end: it alternates Square and Blink
-// and loops. Real sequences will be authored in the editor and loaded.
-redfox::show::Timeline makeDemoTimeline() {
-    redfox::show::Timeline timeline;
-    timeline.name = "Demo Sequence";
-    timeline.steps = {
-        {0.0, 0}, // Square
-        {3.0, 1}, // Blink
-        {6.0, 0}, // Square again
-    };
-    timeline.durationSeconds = 9.0;
-    timeline.loop = true;
-    return timeline;
-}
 
 // Apply the UI's live master controls on top of the cue's own output: an
 // audio-reactive bass pulse and a uniform static scale together set the size,
@@ -184,8 +135,9 @@ int main() {
         std::cout << "Loaded show \"" << show->name << "\" (" << show->cues.size()
                   << " cues, " << timeline.steps.size() << " timeline steps)." << std::endl;
     } else {
-        show = makeDemoShow();
-        timeline = makeDemoTimeline();
+        auto demo = std::make_shared<redfox::show::Show>(redfox::show::makeDemoShow());
+        timeline = demo->timeline;
+        show = demo;
         std::cout << "No show.rfsh found; using built-in demo show." << std::endl;
     }
 

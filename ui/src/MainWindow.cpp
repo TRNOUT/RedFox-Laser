@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "EditorWindow.hpp"
+#include "TimelineEditor.hpp"
 #include "PreviewWidget.hpp"
 
 #include <QFont>
@@ -139,6 +140,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(editorButton, &QPushButton::clicked, this, &MainWindow::openEditor);
     layout->addWidget(editorButton);
 
+    auto* timelineButton = new QPushButton("Open Timeline Editor", central);
+    connect(timelineButton, &QPushButton::clicked, this, &MainWindow::openTimelineEditor);
+    layout->addWidget(timelineButton);
+
     setCentralWidget(central);
 
     connect(armButton, &QPushButton::clicked, this, &MainWindow::onArm);
@@ -217,6 +222,15 @@ void MainWindow::openEditor() {
     editor_->show();
     editor_->raise();
     editor_->activateWindow();
+}
+
+void MainWindow::openTimelineEditor() {
+    if (!timelineEditor_) {
+        timelineEditor_ = new TimelineEditor(this);
+    }
+    timelineEditor_->show();
+    timelineEditor_->raise();
+    timelineEditor_->activateWindow();
 }
 
 void MainWindow::onArm() {

@@ -13,6 +13,7 @@ class QLabel;
 class QSlider;
 class QTimer;
 class EditorWindow;
+class TimelineEditor;
 class PreviewWidget;
 
 // The main application window. It stands in front of the headless engine,
@@ -30,6 +31,7 @@ private slots:
     void onEmergencyStop();
     void onClearEStop();
     void openEditor();
+    void openTimelineEditor();
     void tick();
 
 private:
@@ -48,6 +50,7 @@ private:
     QSlider* audioAmountSlider_ = nullptr;
     QTimer* timer_ = nullptr;
     EditorWindow* editor_ = nullptr;
+    TimelineEditor* timelineEditor_ = nullptr;
     PreviewWidget* preview_ = nullptr;
     std::vector<redfox::ipc::PreviewPoint> previewBuffer_;
 
