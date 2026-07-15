@@ -1,0 +1,3 @@
+add_executable(engine_console main.cpp)
+target_link_libraries(engine_console PRIVATE redfox_engine_core)
+redfox_copy_bundled_libusb_dll(engine_console)

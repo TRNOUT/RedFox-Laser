@@ -1,0 +1,6 @@
+.superpowers/
+build/
+*.log
+out/
+CMakeFiles/
+CMakeCache.txt
