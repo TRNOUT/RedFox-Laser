@@ -4,6 +4,8 @@
 #include "output/LaserOutput.hpp"
 #include "output/MockLaserOutput.hpp"
 #include "playback/FrameGenerator.hpp"
+#include "playback/Sequencer.hpp"
+#include "show/Timeline.hpp"
 #include "midi/MidiInput.hpp"
 #include "midi/MidiMap.hpp"
 #include "midi/MidiTypes.hpp"
@@ -89,6 +91,22 @@ std::shared_ptr<const redfox::show::Show> makeDemoShow() {
     return show;
 }
 
+// A short demo sequence over the demo show's two cues, so the timeline/
+// sequencer path can be exercised end-to-end: it alternates Square and Blink
+// and loops. Real sequences will be authored in the editor and loaded.
+redfox::show::Timeline makeDemoTimeline() {
+    redfox::show::Timeline timeline;
+    timeline.name = "Demo Sequence";
+    timeline.steps = {
+        {0.0, 0}, // Square
+        {3.0, 1}, // Blink
+        {6.0, 0}, // Square again
+    };
+    timeline.durationSeconds = 9.0;
+    timeline.loop = true;
+    return timeline;
+}
+
 // Apply the UI's live master controls on top of the cue's own output: an
 // audio-reactive bass pulse and a uniform static scale together set the size,
 // a static rotation spins the whole figure, and master brightness scales the
@@ -156,6 +174,13 @@ int main() {
     redfox::engine::FrameGenerator frameGenerator(clock);
     frameGenerator.setShow(makeDemoShow());
 
+    // The sequencer auto-triggers cues from a timeline as time advances. It
+    // drives the same FrameGenerator the manual cue buttons do.
+    redfox::engine::Sequencer sequencer(clock);
+    sequencer.setTimeline(makeDemoTimeline());
+    sequencer.setTriggerCallback(
+        [&frameGenerator](std::size_t cueIndex) { frameGenerator.triggerCue(cueIndex); });
+
     // MIDI input: pads (notes 36..43) trigger cues 0..7; note 44 arms, note 45
     // is a panic/blackout. Runs on libremidi's thread; the targets it calls
     // (supervisor, frame generator) are thread-safe.
@@ -206,7 +231,8 @@ int main() {
         });
 
     redfox::ipc::CommandPipeServer commandServer(
-        [&supervisor, &frameGenerator](redfox::ipc::CommandType type, std::uint32_t arg) {
+        [&supervisor, &frameGenerator, &sequencer](redfox::ipc::CommandType type,
+                                                   std::uint32_t arg) {
             using redfox::ipc::CommandType;
             switch (type) {
                 case CommandType::Ping:
@@ -221,10 +247,18 @@ int main() {
                     supervisor.clearEmergencyStop();
                     break;
                 case CommandType::TriggerCue:
+                    sequencer.stop(); // manual cue takes over from the sequence
                     frameGenerator.triggerCue(arg);
                     break;
                 case CommandType::StopCue:
+                    sequencer.stop();
                     frameGenerator.stop();
+                    break;
+                case CommandType::PlaySequence:
+                    sequencer.start();
+                    break;
+                case CommandType::StopSequence:
+                    sequencer.stop();
                     break;
             }
         });
@@ -261,6 +295,7 @@ int main() {
         }
 
         supervisor.tick();
+        sequencer.tick(); // auto-advance the timeline, triggering due cues
 
         // While armed with an active cue, render its current frame to the
         // output and keep the frame-stall watchdog satisfied.

@@ -106,6 +106,24 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
     layout->addWidget(stopCueButton);
 
+    // Timeline transport: play/stop the loaded show sequence.
+    auto* sequenceButtons = new QHBoxLayout();
+    auto* playSequenceButton = new QPushButton("Play Sequence", central);
+    connect(playSequenceButton, &QPushButton::clicked, this, [this]() {
+        if (commands_ && commands_->isConnected()) {
+            commands_->send(redfox::ipc::CommandType::PlaySequence);
+        }
+    });
+    auto* stopSequenceButton = new QPushButton("Stop Sequence", central);
+    connect(stopSequenceButton, &QPushButton::clicked, this, [this]() {
+        if (commands_ && commands_->isConnected()) {
+            commands_->send(redfox::ipc::CommandType::StopSequence);
+        }
+    });
+    sequenceButtons->addWidget(playSequenceButton);
+    sequenceButtons->addWidget(stopSequenceButton);
+    layout->addLayout(sequenceButtons);
+
     // Live master controls: continuous values pushed to the engine over shared
     // memory each tick (see tick()). Ranges are chosen so the initial value is
     // the engine's identity default.

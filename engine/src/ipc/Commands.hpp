@@ -10,6 +10,8 @@ enum class CommandType : std::uint32_t {
     ClearEmergencyStop = 3,
     TriggerCue = 4, // arg = cue index
     StopCue = 5,
+    PlaySequence = 6, // start the loaded timeline from the beginning
+    StopSequence = 7, // stop timeline playback
 };
 
 struct CommandMessage {
