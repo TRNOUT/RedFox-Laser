@@ -10,6 +10,7 @@
 #include "ipc/TelemetryClient.hpp"
 
 class QLabel;
+class QSlider;
 class QTimer;
 class EditorWindow;
 class PreviewWidget;
@@ -41,6 +42,10 @@ private:
     QLabel* stateLabel_ = nullptr;
     QLabel* framesLabel_ = nullptr;
     QLabel* audioLabel_ = nullptr;
+    QSlider* brightnessSlider_ = nullptr;
+    QSlider* scaleSlider_ = nullptr;
+    QSlider* rotationSlider_ = nullptr;
+    QSlider* audioAmountSlider_ = nullptr;
     QTimer* timer_ = nullptr;
     EditorWindow* editor_ = nullptr;
     PreviewWidget* preview_ = nullptr;

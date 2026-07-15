@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -32,6 +33,18 @@ const char* stateName(std::uint32_t wire) {
         case static_cast<std::uint32_t>(SafetyStateWire::EStopLatched): return "Emergency Stop";
         default: return "unknown";
     }
+}
+
+// Build a labelled horizontal slider and append it as a row to `form`. The
+// slider is an integer 0..max; callers convert to the float range they need.
+QSlider* addSlider(QGridLayout* form, int row, const QString& label,
+                   QWidget* parent, int max, int initial) {
+    auto* slider = new QSlider(Qt::Horizontal, parent);
+    slider->setRange(0, max);
+    slider->setValue(initial);
+    form->addWidget(new QLabel(label, parent), row, 0);
+    form->addWidget(slider, row, 1);
+    return slider;
 }
 
 } // namespace
@@ -93,6 +106,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
     layout->addWidget(stopCueButton);
 
+    // Live master controls: continuous values pushed to the engine over shared
+    // memory each tick (see tick()). Ranges are chosen so the initial value is
+    // the engine's identity default.
+    layout->addWidget(new QLabel("Master", central));
+    auto* controls = new QGridLayout();
+    brightnessSlider_ = addSlider(controls, 0, "Brightness", central, 100, 100);
+    scaleSlider_ = addSlider(controls, 1, "Scale", central, 200, 100);
+    rotationSlider_ = addSlider(controls, 2, "Rotation", central, 100, 0);
+    audioAmountSlider_ = addSlider(controls, 3, "Audio react", central, 100, 30);
+    layout->addLayout(controls);
+
     auto* editorButton = new QPushButton("Open Vector Editor", central);
     connect(editorButton, &QPushButton::clicked, this, &MainWindow::openEditor);
     layout->addWidget(editorButton);
@@ -130,7 +154,18 @@ void MainWindow::tick() {
 
     if (telemetry_ && telemetry_->isValid()) {
         // Keep the engine's heartbeat watchdog satisfied.
-        telemetry_->telemetry().uiHeartbeatEpochMs.store(nowEpochMs());
+        auto& tel = telemetry_->telemetry();
+        tel.uiHeartbeatEpochMs.store(nowEpochMs());
+
+        // Push the live master controls to the engine.
+        tel.ctrlMasterBrightness.store(brightnessSlider_->value() / 100.0f,
+                                       std::memory_order_relaxed);
+        tel.ctrlMasterScale.store(scaleSlider_->value() / 100.0f,
+                                  std::memory_order_relaxed);
+        tel.ctrlMasterRotationTurns.store(rotationSlider_->value() / 100.0f,
+                                          std::memory_order_relaxed);
+        tel.ctrlAudioAmount.store(audioAmountSlider_->value() / 100.0f,
+                                  std::memory_order_relaxed);
         const std::uint32_t state = telemetry_->telemetry().safetyState.load();
         stateLabel_->setText(QString("Safety state: ") + stateName(state));
         framesLabel_->setText(

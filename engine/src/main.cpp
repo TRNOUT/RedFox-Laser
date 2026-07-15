@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <iostream>
 #include <memory>
@@ -86,6 +87,36 @@ std::shared_ptr<const redfox::show::Show> makeDemoShow() {
     show->cues.push_back(blink);
 
     return show;
+}
+
+// Apply the UI's live master controls on top of the cue's own output: an
+// audio-reactive bass pulse and a uniform static scale together set the size,
+// a static rotation spins the whole figure, and master brightness scales the
+// colour. All inputs default to identity, so with the UI idle this leaves the
+// frame untouched.
+void applyMasterControls(const redfox::ipc::EngineTelemetry& t,
+                         std::vector<redfox::output::OutputPoint>& points) {
+    const float bass = t.audioBass.load(std::memory_order_relaxed);
+    const float audioAmount = t.ctrlAudioAmount.load(std::memory_order_relaxed);
+    const float pulse = 1.0f + (bass < 1.0f ? bass : 1.0f) * audioAmount;
+    const float scale = t.ctrlMasterScale.load(std::memory_order_relaxed) * pulse;
+    const float brightness = t.ctrlMasterBrightness.load(std::memory_order_relaxed);
+    const float turns = t.ctrlMasterRotationTurns.load(std::memory_order_relaxed);
+
+    constexpr float kTwoPi = 6.28318530717958647692f;
+    const float angle = turns * kTwoPi;
+    const float ca = std::cos(angle);
+    const float sa = std::sin(angle);
+
+    for (auto& p : points) {
+        const float sx = p.x * scale;
+        const float sy = p.y * scale;
+        p.x = sx * ca - sy * sa;
+        p.y = sx * sa + sy * ca;
+        p.r *= brightness;
+        p.g *= brightness;
+        p.b *= brightness;
+    }
 }
 
 } // namespace
@@ -237,13 +268,7 @@ int main() {
         if (supervisor.state() == redfox::safety::SafetyState::Armed &&
             frameGenerator.hasActiveCue()) {
             if (frameGenerator.currentFrame(outputPoints)) {
-                // Audio-reactive pulse: bass energy briefly scales the geometry.
-                const float bass = telemetry.audioBass.load(std::memory_order_relaxed);
-                const float pulse = 1.0f + (bass < 1.0f ? bass : 1.0f) * 0.3f;
-                for (auto& p : outputPoints) {
-                    p.x *= pulse;
-                    p.y *= pulse;
-                }
+                applyMasterControls(telemetry, outputPoints);
                 mockOutput->sendFrame(outputPoints);
                 supervisor.notifyFrameProduced();
                 telemetry.framesSent.fetch_add(1, std::memory_order_relaxed);

@@ -40,6 +40,16 @@ struct EngineTelemetry {
     std::atomic<float> audioHigh{0.0f};
     std::atomic<std::uint64_t> beatCount{0};
 
+    // Live master controls: written by the UI (like uiHeartbeat), read by the
+    // engine each frame and applied on top of the active cue. Defaults are the
+    // identity so a fresh engine outputs the show unmodified until the UI moves
+    // a slider. Continuous values live here rather than on the command pipe so
+    // dragging a slider can't flood the discrete command channel.
+    std::atomic<float> ctrlMasterBrightness{1.0f}; // 0..1 scales output colour
+    std::atomic<float> ctrlMasterScale{1.0f};      // uniform geometry scale
+    std::atomic<float> ctrlMasterRotationTurns{0.0f}; // static rotation, turns
+    std::atomic<float> ctrlAudioAmount{0.3f};      // bass-pulse depth (0 = off)
+
     // Live preview of the current output frame, published with a seqlock: the
     // sequence is odd while the engine writes and even when stable, so the UI
     // can read a torn-free snapshot without a cross-process mutex.
@@ -88,7 +98,7 @@ inline std::size_t readPreview(const EngineTelemetry& t, PreviewPoint* out) {
     return 0;
 }
 
-inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v4";
+inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v5";
 inline constexpr std::size_t kTelemetrySharedMemorySize = sizeof(EngineTelemetry);
 
 } // namespace redfox::ipc
