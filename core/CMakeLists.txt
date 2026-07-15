@@ -4,6 +4,8 @@ add_library(redfox_core STATIC
     src/ilda/IldaCodec.cpp
     src/show/CuePlayback.cpp
     src/show/ShowFile.cpp
+    src/show/Transform.cpp
+    src/effects/Oscillator.cpp
     src/midi/MidiParser.cpp
     src/midi/MidiMap.cpp
 )
