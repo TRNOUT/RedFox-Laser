@@ -3,6 +3,8 @@
 add_library(redfox_core STATIC
     src/ilda/IldaCodec.cpp
     src/show/CuePlayback.cpp
+    src/midi/MidiParser.cpp
+    src/midi/MidiMap.cpp
 )
 target_include_directories(redfox_core PUBLIC src)
 
