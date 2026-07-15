@@ -8,6 +8,7 @@ class QCheckBox;
 class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QTableWidget;
 class TimelineRuler;
 
@@ -27,21 +28,31 @@ private slots:
     void removeSelectedStep();
     void save();
     void reload();
+    void importCue();
+    void renameCue();
+    void deleteCue();
+    void onCueSelectionChanged();
+    void applyCueSettings();
 
 private:
     void loadFromShow(const redfox::show::Show& show);
     void addRow(double timeSeconds, int cueIndex);
-    void rebuildCueLegend();
+    void rebuildCueList();
     void refreshRuler();
+    void commitTableToShow();  // fold the step table into show_.timeline (sorted)
+    int selectedCue() const;   // index into show_.cues, or -1
 
     redfox::show::Show show_;
     std::string showPath_;
 
-    QLabel* cueLegend_ = nullptr;
+    QListWidget* cueList_ = nullptr;
+    QDoubleSpinBox* cueFpsSpin_ = nullptr;
+    QCheckBox* cueLoopCheck_ = nullptr;
     QLineEdit* nameEdit_ = nullptr;
     QDoubleSpinBox* durationSpin_ = nullptr;
     QCheckBox* loopCheck_ = nullptr;
     TimelineRuler* ruler_ = nullptr;
     QTableWidget* table_ = nullptr;
     QLabel* statusLabel_ = nullptr;
+    bool updatingCueSettings_ = false; // guard against feedback while populating
 };

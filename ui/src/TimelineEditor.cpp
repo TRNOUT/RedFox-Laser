@@ -4,10 +4,14 @@
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
@@ -15,26 +19,51 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "ilda/IldaCodec.hpp"
 #include "ipc/CommandPipeClient.hpp"
 #include "ipc/Commands.hpp"
 #include "show/DemoContent.hpp"
+#include "show/ShowEditing.hpp"
 #include "show/ShowFile.hpp"
 
 #include <algorithm>
+#include <filesystem>
 
 TimelineEditor::TimelineEditor(QWidget* parent)
     : QMainWindow(parent), showPath_(redfox::show::defaultShowFilePath()) {
     setWindowTitle("RedFox-Laser - Timeline");
-    resize(720, 520);
+    resize(760, 620);
 
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
 
-    cueLegend_ = new QLabel(central);
-    cueLegend_->setWordWrap(true);
-    layout->addWidget(cueLegend_);
+    // --- Cues: the pool of triggerable clips the timeline references. ---
+    auto* cueGroup = new QGroupBox("Cues", central);
+    auto* cueLayout = new QHBoxLayout(cueGroup);
+    cueList_ = new QListWidget(cueGroup);
+    cueLayout->addWidget(cueList_, 1);
 
-    // Sequence-level settings.
+    auto* cueSide = new QVBoxLayout();
+    auto* importButton = new QPushButton("Import .ild as Cue", cueGroup);
+    auto* renameButton = new QPushButton("Rename", cueGroup);
+    auto* deleteButton = new QPushButton("Delete", cueGroup);
+    cueSide->addWidget(importButton);
+    cueSide->addWidget(renameButton);
+    cueSide->addWidget(deleteButton);
+    auto* cueSettings = new QHBoxLayout();
+    cueSettings->addWidget(new QLabel("FPS", cueGroup));
+    cueFpsSpin_ = new QDoubleSpinBox(cueGroup);
+    cueFpsSpin_->setRange(0.1, 240.0);
+    cueFpsSpin_->setDecimals(1);
+    cueSettings->addWidget(cueFpsSpin_);
+    cueLoopCheck_ = new QCheckBox("Loop", cueGroup);
+    cueSettings->addWidget(cueLoopCheck_);
+    cueSide->addLayout(cueSettings);
+    cueSide->addStretch(1);
+    cueLayout->addLayout(cueSide);
+    layout->addWidget(cueGroup);
+
+    // --- Sequence-level settings. ---
     auto* settings = new QHBoxLayout();
     settings->addWidget(new QLabel("Name", central));
     nameEdit_ = new QLineEdit(central);
@@ -48,12 +77,11 @@ TimelineEditor::TimelineEditor(QWidget* parent)
     settings->addWidget(loopCheck_);
     layout->addLayout(settings);
 
-    // The graphical timeline: drag a marker to move its step in time,
-    // double-click empty space to add one. Mirrors the table below.
+    // --- The graphical timeline: drag markers, double-click to add. ---
     ruler_ = new TimelineRuler(central);
     layout->addWidget(ruler_);
 
-    // The step table: one row per {time, cue} trigger.
+    // --- The step table: one row per {time, cue} trigger. ---
     table_ = new QTableWidget(0, 2, central);
     table_->setHorizontalHeaderLabels({"Time (s)", "Cue"});
     table_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
@@ -82,6 +110,15 @@ TimelineEditor::TimelineEditor(QWidget* parent)
     connect(removeButton, &QPushButton::clicked, this, &TimelineEditor::removeSelectedStep);
     connect(reloadButton, &QPushButton::clicked, this, &TimelineEditor::reload);
     connect(saveButton, &QPushButton::clicked, this, &TimelineEditor::save);
+
+    connect(importButton, &QPushButton::clicked, this, &TimelineEditor::importCue);
+    connect(renameButton, &QPushButton::clicked, this, &TimelineEditor::renameCue);
+    connect(deleteButton, &QPushButton::clicked, this, &TimelineEditor::deleteCue);
+    connect(cueList_, &QListWidget::currentRowChanged, this,
+            &TimelineEditor::onCueSelectionChanged);
+    connect(cueFpsSpin_, qOverload<double>(&QDoubleSpinBox::valueChanged), this,
+            [this](double) { applyCueSettings(); });
+    connect(cueLoopCheck_, &QCheckBox::toggled, this, [this](bool) { applyCueSettings(); });
 
     // Ruler edits flow into the table (the source of truth), whose change
     // signals then refresh the ruler — one loop, no divergence.
@@ -118,7 +155,7 @@ void TimelineEditor::reload() {
 }
 
 void TimelineEditor::loadFromShow(const redfox::show::Show& show) {
-    rebuildCueLegend();
+    rebuildCueList();
     nameEdit_->setText(QString::fromStdString(show.timeline.name));
     durationSpin_->setValue(show.timeline.durationSeconds);
     loopCheck_->setChecked(show.timeline.loop);
@@ -130,14 +167,107 @@ void TimelineEditor::loadFromShow(const redfox::show::Show& show) {
     refreshRuler();
 }
 
-void TimelineEditor::rebuildCueLegend() {
-    QString text = QString("Cues in \"%1\":  ").arg(QString::fromStdString(show_.name));
+void TimelineEditor::rebuildCueList() {
+    const int previous = cueList_->currentRow();
+    cueList_->clear();
     for (std::size_t i = 0; i < show_.cues.size(); ++i) {
-        text += QString("[%1] %2   ")
-                    .arg(i)
-                    .arg(QString::fromStdString(show_.cues[i].name));
+        cueList_->addItem(QString("[%1] %2")
+                              .arg(i)
+                              .arg(QString::fromStdString(show_.cues[i].name)));
     }
-    cueLegend_->setText(text);
+    if (!show_.cues.empty()) {
+        const int row = std::clamp(previous, 0, static_cast<int>(show_.cues.size()) - 1);
+        cueList_->setCurrentRow(row);
+    }
+    onCueSelectionChanged();
+}
+
+int TimelineEditor::selectedCue() const {
+    const int row = cueList_->currentRow();
+    return (row >= 0 && row < static_cast<int>(show_.cues.size())) ? row : -1;
+}
+
+void TimelineEditor::onCueSelectionChanged() {
+    const int cue = selectedCue();
+    updatingCueSettings_ = true;
+    if (cue >= 0) {
+        cueFpsSpin_->setValue(show_.cues[cue].framesPerSecond);
+        cueLoopCheck_->setChecked(show_.cues[cue].loop);
+        cueFpsSpin_->setEnabled(true);
+        cueLoopCheck_->setEnabled(true);
+    } else {
+        cueFpsSpin_->setEnabled(false);
+        cueLoopCheck_->setEnabled(false);
+    }
+    updatingCueSettings_ = false;
+}
+
+void TimelineEditor::applyCueSettings() {
+    if (updatingCueSettings_) {
+        return;
+    }
+    const int cue = selectedCue();
+    if (cue >= 0) {
+        show_.cues[cue].framesPerSecond = static_cast<float>(cueFpsSpin_->value());
+        show_.cues[cue].loop = cueLoopCheck_->isChecked();
+    }
+}
+
+void TimelineEditor::importCue() {
+    const QString path =
+        QFileDialog::getOpenFileName(this, "Import ILDA as cue", {}, "ILDA files (*.ild)");
+    if (path.isEmpty()) {
+        return;
+    }
+    const redfox::ilda::ParseResult parsed =
+        redfox::ilda::readIldaFile(path.toStdString());
+    if (!parsed.ok || parsed.frames.empty()) {
+        QMessageBox::warning(this, "Import failed",
+                             QString::fromStdString(parsed.ok ? "File has no frames."
+                                                              : parsed.error));
+        return;
+    }
+
+    redfox::show::Cue cue;
+    cue.name = std::filesystem::path(path.toStdString()).stem().string();
+    if (cue.name.empty()) {
+        cue.name = "Imported";
+    }
+    cue.frames = parsed.frames;
+
+    commitTableToShow(); // preserve current step edits before rebuilding
+    show_.cues.push_back(std::move(cue));
+    loadFromShow(show_);
+    cueList_->setCurrentRow(static_cast<int>(show_.cues.size()) - 1);
+    statusLabel_->setText(QString("Imported cue %1 (%2 frames).")
+                              .arg(QString::fromStdString(show_.cues.back().name))
+                              .arg(parsed.frames.size()));
+}
+
+void TimelineEditor::renameCue() {
+    const int cue = selectedCue();
+    if (cue < 0) {
+        return;
+    }
+    bool ok = false;
+    const QString name = QInputDialog::getText(
+        this, "Rename cue", "Name:", QLineEdit::Normal,
+        QString::fromStdString(show_.cues[cue].name), &ok);
+    if (ok && !name.isEmpty()) {
+        show_.cues[cue].name = name.toStdString();
+        rebuildCueList();
+    }
+}
+
+void TimelineEditor::deleteCue() {
+    const int cue = selectedCue();
+    if (cue < 0) {
+        return;
+    }
+    commitTableToShow(); // keep the current step edits, then fix up indices
+    redfox::show::removeCue(show_, static_cast<std::size_t>(cue));
+    loadFromShow(show_);
+    statusLabel_->setText("Cue deleted; timeline steps updated.");
 }
 
 void TimelineEditor::refreshRuler() {
@@ -190,9 +320,7 @@ void TimelineEditor::removeSelectedStep() {
     }
 }
 
-void TimelineEditor::save() {
-    // Gather the table back into the show's timeline, keeping it sorted by time
-    // so the sequencer (which assumes ascending order) plays it correctly.
+void TimelineEditor::commitTableToShow() {
     redfox::show::Timeline timeline;
     timeline.name = nameEdit_->text().toStdString();
     timeline.durationSeconds = durationSpin_->value();
@@ -210,6 +338,10 @@ void TimelineEditor::save() {
                   return a.timeSeconds < b.timeSeconds;
               });
     show_.timeline = timeline;
+}
+
+void TimelineEditor::save() {
+    commitTableToShow();
 
     if (!redfox::show::writeShowFile(showPath_, show_)) {
         QMessageBox::warning(this, "Save failed",
@@ -224,12 +356,11 @@ void TimelineEditor::save() {
     if (commands.isConnected() &&
         commands.send(redfox::ipc::CommandType::ReloadShow)) {
         statusLabel_->setText(QString("Saved %1 steps — engine reloaded live.")
-                                  .arg(timeline.steps.size()));
+                                  .arg(show_.timeline.steps.size()));
     } else {
         statusLabel_->setText(
-            QString("Saved %1 steps to %2. Engine not running — it will load "
-                    "the show at next start.")
-                .arg(timeline.steps.size())
+            QString("Saved to %1. Engine not running — it will load the show at "
+                    "next start.")
                 .arg(QString::fromStdString(showPath_)));
     }
 }
