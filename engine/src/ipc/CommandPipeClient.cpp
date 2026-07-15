@@ -21,11 +21,11 @@ bool CommandPipeClient::isConnected() const {
     return pipeHandle_ != nullptr;
 }
 
-bool CommandPipeClient::send(CommandType type) {
+bool CommandPipeClient::send(CommandType type, std::uint32_t arg) {
     if (pipeHandle_ == nullptr) {
         return false;
     }
-    CommandMessage message{static_cast<std::uint32_t>(type)};
+    CommandMessage message{static_cast<std::uint32_t>(type), arg};
     DWORD bytesWritten = 0;
     const BOOL ok = WriteFile(reinterpret_cast<HANDLE>(pipeHandle_), &message,
                               sizeof(message), &bytesWritten, nullptr);

@@ -71,7 +71,7 @@ void CommandPipeServer::run() {
                    ReadFile(pipe, &message, sizeof(message), &bytesRead, nullptr) &&
                    bytesRead == sizeof(message)) {
                 if (handler_) {
-                    handler_(static_cast<CommandType>(message.type));
+                    handler_(static_cast<CommandType>(message.type), message.arg);
                 }
             }
         }

@@ -17,14 +17,15 @@ enum class SafetyStateWire : std::uint32_t {
 struct EngineTelemetry {
     std::atomic<std::uint64_t> uiHeartbeatEpochMs{0};
     std::atomic<std::uint64_t> engineHeartbeatEpochMs{0};
+    std::atomic<std::uint64_t> framesSent{0};    // output frames sent since start
     std::atomic<std::uint32_t> safetyState{0};   // SafetyStateWire
-    std::atomic<std::uint32_t> lastEventCode{0};
+    std::atomic<std::uint32_t> lastEventCode{0}; // last SafetyEventCode
 };
 
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
               "EngineTelemetry fields must be lock-free for cross-process shared memory use");
 
-inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v1";
+inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v2";
 inline constexpr std::size_t kTelemetrySharedMemorySize = sizeof(EngineTelemetry);
 
 } // namespace redfox::ipc

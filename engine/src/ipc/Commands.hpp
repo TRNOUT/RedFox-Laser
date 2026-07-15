@@ -8,12 +8,15 @@ enum class CommandType : std::uint32_t {
     Arm = 1,
     EmergencyStop = 2,
     ClearEmergencyStop = 3,
+    TriggerCue = 4, // arg = cue index
+    StopCue = 5,
 };
 
 struct CommandMessage {
     std::uint32_t type = 0; // CommandType
+    std::uint32_t arg = 0;  // command-specific (e.g. cue index for TriggerCue)
 };
 
-inline constexpr wchar_t kCommandPipeName[] = L"\\\\.\\pipe\\RedFoxLaser_Commands_v1";
+inline constexpr wchar_t kCommandPipeName[] = L"\\\\.\\pipe\\RedFoxLaser_Commands_v2";
 
 } // namespace redfox::ipc

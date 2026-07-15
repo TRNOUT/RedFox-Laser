@@ -12,7 +12,7 @@ namespace redfox::ipc {
 // bug surface for negligible cost. One client (the UI) at a time.
 class CommandPipeServer {
 public:
-    using CommandHandler = std::function<void(CommandType)>;
+    using CommandHandler = std::function<void(CommandType, std::uint32_t)>;
 
     explicit CommandPipeServer(CommandHandler handler);
     ~CommandPipeServer();

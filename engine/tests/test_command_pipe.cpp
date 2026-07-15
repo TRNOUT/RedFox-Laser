@@ -3,6 +3,7 @@
 #include "../src/ipc/CommandPipeClient.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -28,7 +29,7 @@ TEST_CASE("CommandPipeClient can send commands the server receives, in order", "
     std::mutex receivedMutex;
     std::vector<CommandType> received;
 
-    CommandPipeServer server([&](CommandType type) {
+    CommandPipeServer server([&](CommandType type, std::uint32_t) {
         std::lock_guard<std::mutex> lock(receivedMutex);
         received.push_back(type);
     });

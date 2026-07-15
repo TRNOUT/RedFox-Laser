@@ -13,7 +13,7 @@ public:
     CommandPipeClient& operator=(const CommandPipeClient&) = delete;
 
     bool isConnected() const;
-    bool send(CommandType type);
+    bool send(CommandType type, std::uint32_t arg = 0);
 
 private:
     void* pipeHandle_ = nullptr; // HANDLE, kept as void* to keep windows.h out of this header

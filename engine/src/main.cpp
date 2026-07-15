@@ -1,7 +1,11 @@
 #include "safety/Clock.hpp"
 #include "safety/SafetySupervisor.hpp"
 #include "safety/SafetyEventLog.hpp"
+#include "output/LaserOutput.hpp"
 #include "output/MockLaserOutput.hpp"
+#include "playback/FrameGenerator.hpp"
+#include "show/Show.hpp"
+#include "ilda/IldaTypes.hpp"
 #include "ipc/TelemetryHost.hpp"
 #include "ipc/CommandPipeServer.hpp"
 
@@ -13,6 +17,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <vector>
 
 // The Engine reports its SafetyState to the UI over shared memory as a
 // SafetyStateWire value via a plain static_cast (see the main loop below).
@@ -44,6 +49,40 @@ std::uint64_t nowEpochMs() {
         duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
 }
 
+// A tiny built-in show so the playback path can be exercised end-to-end against
+// the mock output before real content loading exists.
+std::shared_ptr<const redfox::show::Show> makeDemoShow() {
+    using namespace redfox;
+    auto show = std::make_shared<show::Show>();
+    show->name = "Demo";
+
+    show::Cue square;
+    square.name = "Square";
+    ilda::IldaFrame squareFrame;
+    constexpr std::uint8_t kWhite = 255;
+    squareFrame.points = {
+        {-0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
+        {0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
+        {0.5f, 0.5f, 0.0f, kWhite, kWhite, kWhite, false},
+        {-0.5f, 0.5f, 0.0f, kWhite, kWhite, kWhite, false},
+        {-0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
+    };
+    square.frames = {squareFrame};
+    show->cues.push_back(square);
+
+    show::Cue blink;
+    blink.name = "Blink";
+    blink.framesPerSecond = 4.0f;
+    ilda::IldaFrame dotOn;
+    dotOn.points = {{0.0f, 0.0f, 0.0f, 255, 0, 0, false}};
+    ilda::IldaFrame dotOff;
+    dotOff.points = {{0.0f, 0.0f, 0.0f, 0, 0, 0, true}};
+    blink.frames = {dotOn, dotOff};
+    show->cues.push_back(blink);
+
+    return show;
+}
+
 } // namespace
 
 int main() {
@@ -61,23 +100,28 @@ int main() {
     auto mockOutput = std::make_shared<redfox::output::MockLaserOutput>();
     supervisor.registerOutput(mockOutput);
 
-    redfox::safety::SafetyEventLog eventLog(".\\logs");
-
-    supervisor.setEventCallback([&eventLog](redfox::safety::SafetyEventCode code,
-                                             redfox::safety::SafetyState state) {
-        std::cout << "[safety] event=" << static_cast<int>(code)
-                  << " state=" << static_cast<int>(state) << std::endl;
-        eventLog.record(code, state);
-    });
-
     redfox::ipc::TelemetryHost telemetryHost;
     if (!telemetryHost.isValid()) {
         std::cerr << "Failed to create telemetry shared memory.\n";
         return 1;
     }
 
+    redfox::safety::SafetyEventLog eventLog(".\\logs");
+
+    supervisor.setEventCallback([&eventLog, &telemetryHost](
+                                    redfox::safety::SafetyEventCode code,
+                                    redfox::safety::SafetyState state) {
+        std::cout << "[safety] event=" << static_cast<int>(code)
+                  << " state=" << static_cast<int>(state) << std::endl;
+        eventLog.record(code, state);
+        telemetryHost.telemetry().lastEventCode.store(static_cast<std::uint32_t>(code));
+    });
+
+    redfox::engine::FrameGenerator frameGenerator(clock);
+    frameGenerator.setShow(makeDemoShow());
+
     redfox::ipc::CommandPipeServer commandServer(
-        [&supervisor](redfox::ipc::CommandType type) {
+        [&supervisor, &frameGenerator](redfox::ipc::CommandType type, std::uint32_t arg) {
             using redfox::ipc::CommandType;
             switch (type) {
                 case CommandType::Ping:
@@ -91,12 +135,19 @@ int main() {
                 case CommandType::ClearEmergencyStop:
                     supervisor.clearEmergencyStop();
                     break;
+                case CommandType::TriggerCue:
+                    frameGenerator.triggerCue(arg);
+                    break;
+                case CommandType::StopCue:
+                    frameGenerator.stop();
+                    break;
             }
         });
     commandServer.start();
 
     std::cout << "RedFox-Laser Engine running (mock output). Ctrl+C to stop." << std::endl;
 
+    std::vector<redfox::output::OutputPoint> outputPoints;
     std::uint64_t lastSeenUiHeartbeat = 0;
     while (g_shouldRun.load()) {
         auto& telemetry = telemetryHost.telemetry();
@@ -108,6 +159,17 @@ int main() {
         }
 
         supervisor.tick();
+
+        // While armed with an active cue, render its current frame to the
+        // output and keep the frame-stall watchdog satisfied.
+        if (supervisor.state() == redfox::safety::SafetyState::Armed &&
+            frameGenerator.hasActiveCue()) {
+            if (frameGenerator.currentFrame(outputPoints)) {
+                mockOutput->sendFrame(outputPoints);
+                supervisor.notifyFrameProduced();
+                telemetry.framesSent.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
 
         telemetry.engineHeartbeatEpochMs.store(nowEpochMs());
         telemetry.safetyState.store(static_cast<std::uint32_t>(supervisor.state()));

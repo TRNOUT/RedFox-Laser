@@ -50,7 +50,8 @@ int main() {
 
     std::thread heartbeatThread(heartbeatLoop, std::ref(telemetry));
 
-    std::cout << "Connected. Commands: arm, estop, clear, ping, status, quit" << std::endl;
+    std::cout << "Connected. Commands: arm, estop, clear, ping, cue <n>, "
+                 "stopcue, status, quit" << std::endl;
 
     std::string line;
     while (g_running.load() && std::getline(std::cin, line)) {
@@ -62,8 +63,19 @@ int main() {
             commands.send(redfox::ipc::CommandType::ClearEmergencyStop);
         } else if (line == "ping") {
             commands.send(redfox::ipc::CommandType::Ping);
+        } else if (line.rfind("cue ", 0) == 0) {
+            try {
+                const std::uint32_t index =
+                    static_cast<std::uint32_t>(std::stoul(line.substr(4)));
+                commands.send(redfox::ipc::CommandType::TriggerCue, index);
+            } catch (const std::exception&) {
+                std::cout << "usage: cue <index>" << std::endl;
+            }
+        } else if (line == "stopcue") {
+            commands.send(redfox::ipc::CommandType::StopCue);
         } else if (line == "status") {
             std::cout << "safetyState=" << telemetry.telemetry().safetyState.load()
+                      << " framesSent=" << telemetry.telemetry().framesSent.load()
                       << " engineHeartbeatEpochMs=" << telemetry.telemetry().engineHeartbeatEpochMs.load()
                       << std::endl;
         } else if (line == "quit") {
