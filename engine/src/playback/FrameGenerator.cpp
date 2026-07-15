@@ -1,6 +1,7 @@
 #include "playback/FrameGenerator.hpp"
 
 #include "show/CuePlayback.hpp"
+#include "show/Transform.hpp"
 
 #include <chrono>
 
@@ -54,8 +55,13 @@ bool FrameGenerator::currentFrame(std::vector<output::OutputPoint>& out) const {
         return false;
     }
 
+    // Effective transform: the cue's base transform plus its time-driven spin.
+    show::Transform transform = cue.transform;
+    transform.rotationTurns += cue.spinTurnsPerSec * static_cast<float>(elapsedSeconds);
+
     out.reserve(frame.points.size());
-    for (const ilda::IldaPoint& p : frame.points) {
+    for (const ilda::IldaPoint& raw : frame.points) {
+        const ilda::IldaPoint p = show::applyTransform(raw, transform);
         output::OutputPoint op;
         op.x = p.x;
         op.y = p.y;

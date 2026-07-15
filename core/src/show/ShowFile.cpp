@@ -9,7 +9,7 @@ namespace redfox::show {
 namespace {
 
 constexpr char kMagic[4] = {'R', 'F', 'S', 'H'};
-constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kVersion = 2;
 
 void putU32(std::vector<std::uint8_t>& out, std::uint32_t v) {
     out.push_back(static_cast<std::uint8_t>(v & 0xFF));
@@ -98,6 +98,12 @@ std::vector<std::uint8_t> writeShow(const Show& show) {
         putString(out, cue.name);
         putFloat(out, cue.framesPerSecond);
         out.push_back(cue.loop ? 1 : 0);
+        putFloat(out, cue.transform.offsetX);
+        putFloat(out, cue.transform.offsetY);
+        putFloat(out, cue.transform.scale);
+        putFloat(out, cue.transform.rotationTurns);
+        putFloat(out, cue.transform.brightness);
+        putFloat(out, cue.spinTurnsPerSec);
         putBytes(out, ilda::writeIlda(cue.frames));
     }
     return out;
@@ -129,6 +135,12 @@ ShowParseResult readShow(const std::vector<std::uint8_t>& bytes) {
         }
         cue.loop = (*r.p++ != 0);
         r.remaining -= 1;
+        cue.transform.offsetX = r.f32();
+        cue.transform.offsetY = r.f32();
+        cue.transform.scale = r.f32();
+        cue.transform.rotationTurns = r.f32();
+        cue.transform.brightness = r.f32();
+        cue.spinTurnsPerSec = r.f32();
 
         const std::vector<std::uint8_t> ildaBytes = r.bytes();
         if (!r.ok) {

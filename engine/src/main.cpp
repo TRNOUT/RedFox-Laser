@@ -71,6 +71,7 @@ std::shared_ptr<const redfox::show::Show> makeDemoShow() {
         {-0.5f, -0.5f, 0.0f, kWhite, kWhite, kWhite, false},
     };
     square.frames = {squareFrame};
+    square.spinTurnsPerSec = 0.2f; // slowly rotating, to show effects in the preview
     show->cues.push_back(square);
 
     show::Cue blink;

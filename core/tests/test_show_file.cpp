@@ -18,6 +18,9 @@ show::Show makeSampleShow() {
     square.name = "Square";
     square.framesPerSecond = 24.0f;
     square.loop = false;
+    square.transform.offsetX = 0.1f;
+    square.transform.scale = 0.5f;
+    square.spinTurnsPerSec = 2.0f;
     ilda::IldaFrame f;
     f.points = {
         {0.5f, 0.5f, 0.0f, 255, 0, 0, false},
@@ -53,6 +56,9 @@ TEST_CASE("a show round-trips through the binary format", "[show][file]") {
     REQUIRE(c0.name == "Square");
     REQUIRE(near(c0.framesPerSecond, 24.0f));
     REQUIRE_FALSE(c0.loop);
+    REQUIRE(near(c0.transform.offsetX, 0.1f));
+    REQUIRE(near(c0.transform.scale, 0.5f));
+    REQUIRE(near(c0.spinTurnsPerSec, 2.0f));
     REQUIRE(c0.frames.size() == 1);
     REQUIRE(c0.frames[0].points.size() == 2);
     REQUIRE(c0.frames[0].points[0].r == 255);

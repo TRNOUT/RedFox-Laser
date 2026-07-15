@@ -113,6 +113,53 @@ TEST_CASE("stop() clears the active cue", "[playback]") {
     REQUIRE_FALSE(gen.currentFrame(pts));
 }
 
+TEST_CASE("a cue's base transform is applied to output points", "[playback]") {
+    safety::FakeClock clock;
+    engine::FrameGenerator gen(clock);
+
+    auto show = makeShow();
+    show::Cue cue;
+    cue.transform.offsetX = 0.2f;
+    cue.transform.offsetY = -0.1f;
+    ilda::IldaFrame f;
+    f.points = {{0.3f, 0.4f, 0.0f, 255, 0, 0, false}};
+    cue.frames = {f};
+    show->cues.push_back(cue);
+
+    gen.setShow(show);
+    gen.triggerCue(0);
+
+    std::vector<output::OutputPoint> pts;
+    REQUIRE(gen.currentFrame(pts));
+    REQUIRE(near(pts[0].x, 0.5f));
+    REQUIRE(near(pts[0].y, 0.3f));
+}
+
+TEST_CASE("cue spin rotates the frame over time", "[playback]") {
+    safety::FakeClock clock;
+    engine::FrameGenerator gen(clock);
+
+    auto show = makeShow();
+    show::Cue cue;
+    cue.spinTurnsPerSec = 0.25f; // quarter turn per second
+    ilda::IldaFrame f;
+    f.points = {{1.0f, 0.0f, 0.0f, 10, 10, 10, false}};
+    cue.frames = {f};
+    show->cues.push_back(cue);
+
+    gen.setShow(show);
+    gen.triggerCue(0);
+
+    std::vector<output::OutputPoint> pts;
+    REQUIRE(gen.currentFrame(pts));
+    REQUIRE(near(pts[0].x, 1.0f)); // t=0: no rotation
+
+    clock.advance(1000ms); // +0.25 turn: (1,0) -> (0,1)
+    REQUIRE(gen.currentFrame(pts));
+    REQUIRE(near(pts[0].x, 0.0f));
+    REQUIRE(near(pts[0].y, 1.0f));
+}
+
 TEST_CASE("triggering an out-of-range cue index is ignored", "[playback]") {
     safety::FakeClock clock;
     engine::FrameGenerator gen(clock);

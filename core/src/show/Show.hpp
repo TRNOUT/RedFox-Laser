@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ilda/IldaTypes.hpp"
+#include "show/Transform.hpp"
 
 #include <string>
 #include <vector>
@@ -14,6 +15,11 @@ struct Cue {
     ilda::IldaShow frames;          // 1 = still, >1 = animation
     float framesPerSecond = 30.0f;  // animation playback rate
     bool loop = true;               // loop vs. hold the last frame
+
+    // A base transform applied to every point, plus a continuous spin (turns per
+    // second) added to its rotation over playback time.
+    Transform transform;
+    float spinTurnsPerSec = 0.0f;
 };
 
 // A show is a collection of cues. Grid/timeline placement is layered on top of
