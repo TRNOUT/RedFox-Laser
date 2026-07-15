@@ -3,9 +3,11 @@
 An open-source laser show control application for Windows — a live-performance
 tool and editor for driving ILDA laser projectors.
 
-> **Status:** early development. The engine foundation is in place and tested;
-> the user interface, vector editor, and hardware output backends are in
-> progress.
+> **Status:** early but functional. Working today: the safety engine with
+> end-to-end cue playback, a shared core library (ILDA read/write, show data
+> model, MIDI parsing/mapping, a binary show format), MIDI-controller input
+> (libremidi), and a Qt UI with engine controls, a cue grid, and a vector
+> editor. Real ShowNET hardware output is pending an SDK integration.
 
 ## Design
 
@@ -84,6 +86,10 @@ the source before using the light-emitting option):
 ```
 build\tools\idn_probe\Debug\idn_probe.exe
 ```
+
+MIDI: if a MIDI input device is present, the engine opens it on startup and maps
+pad notes 36–43 to cues 0–7 (note 44 arms, note 45 blackouts). The vector editor
+opens from the UI's "Open Vector Editor" button.
 
 ## Tests
 
