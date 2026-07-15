@@ -4,6 +4,9 @@
 #include "output/LaserOutput.hpp"
 #include "output/MockLaserOutput.hpp"
 #include "playback/FrameGenerator.hpp"
+#include "midi/MidiInput.hpp"
+#include "midi/MidiMap.hpp"
+#include "midi/MidiTypes.hpp"
 #include "show/Show.hpp"
 #include "ilda/IldaTypes.hpp"
 #include "ipc/TelemetryHost.hpp"
@@ -119,6 +122,47 @@ int main() {
 
     redfox::engine::FrameGenerator frameGenerator(clock);
     frameGenerator.setShow(makeDemoShow());
+
+    // MIDI input: pads (notes 36..43) trigger cues 0..7; note 44 arms, note 45
+    // is a panic/blackout. Runs on libremidi's thread; the targets it calls
+    // (supervisor, frame generator) are thread-safe.
+    redfox::engine::MidiInput midiInput;
+    {
+        redfox::midi::MidiMap midiMap;
+        for (int i = 0; i < 8; ++i) {
+            midiMap.bind({redfox::midi::MidiType::NoteOn, 0,
+                          static_cast<std::uint8_t>(36 + i),
+                          redfox::midi::ActionType::TriggerCue, i});
+        }
+        midiMap.bind({redfox::midi::MidiType::NoteOn, 0, 44, redfox::midi::ActionType::Arm, 0});
+        midiMap.bind({redfox::midi::MidiType::NoteOn, 0, 45, redfox::midi::ActionType::Blackout, 0});
+        midiInput.setMap(midiMap);
+    }
+    midiInput.setActionCallback(
+        [&supervisor, &frameGenerator](const redfox::midi::Action& action) {
+            using redfox::midi::ActionType;
+            switch (action.type) {
+                case ActionType::TriggerCue:
+                    frameGenerator.triggerCue(static_cast<std::size_t>(action.cueIndex));
+                    break;
+                case ActionType::Arm:
+                    supervisor.requestArm();
+                    break;
+                case ActionType::Blackout:
+                    supervisor.triggerEmergencyStop();
+                    break;
+                case ActionType::SetMasterBrightness:
+                case ActionType::None:
+                    break;
+            }
+        });
+    const std::string midiPort = midiInput.openFirstPort();
+    if (!midiPort.empty()) {
+        std::cout << "MIDI: listening on \"" << midiPort << "\"" << std::endl;
+    } else {
+        std::cout << "MIDI: no input device found (controls still work over IPC)."
+                  << std::endl;
+    }
 
     redfox::ipc::CommandPipeServer commandServer(
         [&supervisor, &frameGenerator](redfox::ipc::CommandType type, std::uint32_t arg) {

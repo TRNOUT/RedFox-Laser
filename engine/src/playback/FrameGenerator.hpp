@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 namespace redfox::engine {
@@ -19,11 +20,13 @@ class FrameGenerator {
 public:
     explicit FrameGenerator(safety::Clock& clock);
 
+    // Thread-safe: setShow/trigger/stop may be called from a control thread
+    // (e.g. MIDI or IPC) while the engine loop calls currentFrame().
     void setShow(std::shared_ptr<const show::Show> show);
     void triggerCue(std::size_t cueIndex); // start playing a cue from now
     void stop();                           // clear the active cue
 
-    bool hasActiveCue() const { return active_; }
+    bool hasActiveCue() const;
 
     // Fill `out` with the active cue's current frame (ILDA points converted to
     // normalised output points; blanked points emit no colour). Returns false
@@ -32,6 +35,7 @@ public:
 
 private:
     safety::Clock& clock_;
+    mutable std::mutex mutex_;
     std::shared_ptr<const show::Show> show_;
     bool active_ = false;
     std::size_t cueIndex_ = 0;

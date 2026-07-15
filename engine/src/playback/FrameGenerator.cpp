@@ -9,11 +9,13 @@ namespace redfox::engine {
 FrameGenerator::FrameGenerator(safety::Clock& clock) : clock_(clock) {}
 
 void FrameGenerator::setShow(std::shared_ptr<const show::Show> show) {
+    std::lock_guard<std::mutex> lock(mutex_);
     show_ = std::move(show);
     active_ = false;
 }
 
 void FrameGenerator::triggerCue(std::size_t cueIndex) {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (!show_ || cueIndex >= show_->cues.size()) {
         return; // ignore out-of-range / no show
     }
@@ -22,9 +24,18 @@ void FrameGenerator::triggerCue(std::size_t cueIndex) {
     active_ = true;
 }
 
-void FrameGenerator::stop() { active_ = false; }
+void FrameGenerator::stop() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    active_ = false;
+}
+
+bool FrameGenerator::hasActiveCue() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return active_;
+}
 
 bool FrameGenerator::currentFrame(std::vector<output::OutputPoint>& out) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     out.clear();
     if (!active_ || !show_ || cueIndex_ >= show_->cues.size()) {
         return false;
