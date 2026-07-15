@@ -9,7 +9,10 @@ namespace redfox::show {
 namespace {
 
 constexpr char kMagic[4] = {'R', 'F', 'S', 'H'};
-constexpr std::uint32_t kVersion = 2;
+constexpr std::uint32_t kVersion = 3;
+// The lowest version this reader still understands. v2 shows have no timeline;
+// they load with an empty one.
+constexpr std::uint32_t kMinReadableVersion = 2;
 
 void putU32(std::vector<std::uint8_t>& out, std::uint32_t v) {
     out.push_back(static_cast<std::uint8_t>(v & 0xFF));
@@ -22,6 +25,14 @@ void putFloat(std::vector<std::uint8_t>& out, float f) {
     std::uint32_t bits;
     std::memcpy(&bits, &f, sizeof(bits));
     putU32(out, bits);
+}
+
+void putDouble(std::vector<std::uint8_t>& out, double d) {
+    std::uint64_t bits;
+    std::memcpy(&bits, &d, sizeof(bits));
+    for (int i = 0; i < 8; ++i) {
+        out.push_back(static_cast<std::uint8_t>((bits >> (8 * i)) & 0xFF));
+    }
 }
 
 void putString(std::vector<std::uint8_t>& out, const std::string& s) {
@@ -59,6 +70,22 @@ struct Reader {
         float f = 0.0f;
         std::memcpy(&f, &bits, sizeof(f));
         return f;
+    }
+
+    double f64() {
+        if (remaining < 8) {
+            ok = false;
+            return 0.0;
+        }
+        std::uint64_t bits = 0;
+        for (int i = 0; i < 8; ++i) {
+            bits |= static_cast<std::uint64_t>(p[i]) << (8 * i);
+        }
+        p += 8;
+        remaining -= 8;
+        double d = 0.0;
+        std::memcpy(&d, &bits, sizeof(d));
+        return d;
     }
 
     std::string str() {
@@ -106,6 +133,16 @@ std::vector<std::uint8_t> writeShow(const Show& show) {
         putFloat(out, cue.spinTurnsPerSec);
         putBytes(out, ilda::writeIlda(cue.frames));
     }
+
+    // Timeline block (version 3+).
+    putString(out, show.timeline.name);
+    putDouble(out, show.timeline.durationSeconds);
+    out.push_back(show.timeline.loop ? 1 : 0);
+    putU32(out, static_cast<std::uint32_t>(show.timeline.steps.size()));
+    for (const TimelineStep& step : show.timeline.steps) {
+        putDouble(out, step.timeSeconds);
+        putU32(out, static_cast<std::uint32_t>(step.cueIndex));
+    }
     return out;
 }
 
@@ -118,7 +155,7 @@ ShowParseResult readShow(const std::vector<std::uint8_t>& bytes) {
 
     Reader r{bytes.data() + 4, bytes.size() - 4};
     const std::uint32_t version = r.u32();
-    if (version != kVersion) {
+    if (version < kMinReadableVersion || version > kVersion) {
         result.error = "unsupported show file version";
         return result;
     }
@@ -153,6 +190,25 @@ ShowParseResult readShow(const std::vector<std::uint8_t>& bytes) {
         }
         cue.frames = frames.frames;
         result.show.cues.push_back(std::move(cue));
+    }
+
+    // Timeline block: present from version 3 on; v2 shows simply have none.
+    if (r.ok && version >= 3) {
+        result.show.timeline.name = r.str();
+        result.show.timeline.durationSeconds = r.f64();
+        if (r.remaining < 1) {
+            r.ok = false;
+        } else {
+            result.show.timeline.loop = (*r.p++ != 0);
+            r.remaining -= 1;
+            const std::uint32_t stepCount = r.u32();
+            for (std::uint32_t i = 0; i < stepCount && r.ok; ++i) {
+                TimelineStep step;
+                step.timeSeconds = r.f64();
+                step.cueIndex = r.u32();
+                result.show.timeline.steps.push_back(step);
+            }
+        }
     }
 
     if (!r.ok) {

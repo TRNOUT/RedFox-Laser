@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ilda/IldaTypes.hpp"
+#include "show/Timeline.hpp"
 #include "show/Transform.hpp"
 
 #include <string>
@@ -22,11 +23,13 @@ struct Cue {
     float spinTurnsPerSec = 0.0f;
 };
 
-// A show is a collection of cues. Grid/timeline placement is layered on top of
-// this by the UI; the data model itself is just the ordered cue list.
+// A show is a collection of cues plus an optional timeline that sequences them
+// automatically over time. The cue list is the raw material; the timeline is
+// how a designed sequence plays back.
 struct Show {
     std::string name;
     std::vector<Cue> cues;
+    Timeline timeline;
 };
 
 } // namespace redfox::show

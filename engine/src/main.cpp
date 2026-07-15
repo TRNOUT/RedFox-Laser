@@ -5,6 +5,7 @@
 #include "output/MockLaserOutput.hpp"
 #include "playback/FrameGenerator.hpp"
 #include "playback/Sequencer.hpp"
+#include "show/ShowFile.hpp"
 #include "show/Timeline.hpp"
 #include "midi/MidiInput.hpp"
 #include "midi/MidiMap.hpp"
@@ -171,13 +172,30 @@ int main() {
         telemetryHost.telemetry().lastEventCode.store(static_cast<std::uint32_t>(code));
     });
 
+    // Load a show authored in the editor if one sits next to the engine,
+    // otherwise fall back to the built-in demo. The show carries its own
+    // timeline; a loaded show with no timeline just leaves the sequencer idle.
+    std::shared_ptr<const redfox::show::Show> show;
+    redfox::show::Timeline timeline;
+    const redfox::show::ShowParseResult loaded = redfox::show::readShowFile("show.rfsh");
+    if (loaded.ok && !loaded.show.cues.empty()) {
+        show = std::make_shared<redfox::show::Show>(loaded.show);
+        timeline = loaded.show.timeline;
+        std::cout << "Loaded show \"" << show->name << "\" (" << show->cues.size()
+                  << " cues, " << timeline.steps.size() << " timeline steps)." << std::endl;
+    } else {
+        show = makeDemoShow();
+        timeline = makeDemoTimeline();
+        std::cout << "No show.rfsh found; using built-in demo show." << std::endl;
+    }
+
     redfox::engine::FrameGenerator frameGenerator(clock);
-    frameGenerator.setShow(makeDemoShow());
+    frameGenerator.setShow(show);
 
     // The sequencer auto-triggers cues from a timeline as time advances. It
     // drives the same FrameGenerator the manual cue buttons do.
     redfox::engine::Sequencer sequencer(clock);
-    sequencer.setTimeline(makeDemoTimeline());
+    sequencer.setTimeline(timeline);
     sequencer.setTriggerCallback(
         [&frameGenerator](std::size_t cueIndex) { frameGenerator.triggerCue(cueIndex); });
 

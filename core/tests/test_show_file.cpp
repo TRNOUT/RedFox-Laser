@@ -40,6 +40,11 @@ show::Show makeSampleShow() {
     blink.frames = {a, b};
     s.cues.push_back(blink);
 
+    s.timeline.name = "Main Sequence";
+    s.timeline.steps = {{0.0, 0}, {2.5, 1}, {5.0, 0}};
+    s.timeline.durationSeconds = 8.0;
+    s.timeline.loop = true;
+
     return s;
 }
 } // namespace
@@ -70,6 +75,15 @@ TEST_CASE("a show round-trips through the binary format", "[show][file]") {
     REQUIRE(c1.loop);
     REQUIRE(c1.frames.size() == 2);
     REQUIRE(c1.frames[1].points[0].g == 50);
+
+    const show::Timeline& tl = parsed.show.timeline;
+    REQUIRE(tl.name == "Main Sequence");
+    REQUIRE(tl.loop);
+    REQUIRE(near(static_cast<float>(tl.durationSeconds), 8.0f));
+    REQUIRE(tl.steps.size() == 3);
+    REQUIRE(near(static_cast<float>(tl.steps[1].timeSeconds), 2.5f));
+    REQUIRE(tl.steps[1].cueIndex == 1);
+    REQUIRE(tl.steps[2].cueIndex == 0);
 }
 
 TEST_CASE("a show round-trips through a file", "[show][file]") {
