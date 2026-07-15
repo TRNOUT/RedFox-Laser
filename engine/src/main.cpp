@@ -237,6 +237,13 @@ int main() {
         if (supervisor.state() == redfox::safety::SafetyState::Armed &&
             frameGenerator.hasActiveCue()) {
             if (frameGenerator.currentFrame(outputPoints)) {
+                // Audio-reactive pulse: bass energy briefly scales the geometry.
+                const float bass = telemetry.audioBass.load(std::memory_order_relaxed);
+                const float pulse = 1.0f + (bass < 1.0f ? bass : 1.0f) * 0.3f;
+                for (auto& p : outputPoints) {
+                    p.x *= pulse;
+                    p.y *= pulse;
+                }
                 mockOutput->sendFrame(outputPoints);
                 supervisor.notifyFrameProduced();
                 telemetry.framesSent.fetch_add(1, std::memory_order_relaxed);
