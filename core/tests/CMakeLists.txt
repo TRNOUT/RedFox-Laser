@@ -1,0 +1,7 @@
+add_executable(redfox_core_tests
+    test_ilda_roundtrip.cpp
+)
+target_link_libraries(redfox_core_tests PRIVATE redfox_core Catch2::Catch2WithMain)
+
+include(Catch)
+catch_discover_tests(redfox_core_tests)

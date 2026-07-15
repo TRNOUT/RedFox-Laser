@@ -6,10 +6,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (NOT WIN32)
-    message(FATAL_ERROR "RedFox-Laser targets Windows only (design spec, section 13).")
+    message(FATAL_ERROR "RedFox-Laser targets Windows only.")
 endif()
 
 include(CTest)
+
+# Test framework (Catch2), fetched once at the top level and shared by every
+# test target (core, engine, ...).
+if (BUILD_TESTING)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.4
+    )
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+endif()
 
 # We only need the libera-core library itself, not its own example/test/GUI
 # targets, and we use its bundled libusb binaries (from the helios_dac
@@ -31,6 +44,7 @@ function(redfox_copy_bundled_libusb_dll target)
     )
 endfunction()
 
+add_subdirectory(core)
 add_subdirectory(tools/idn_probe)
 add_subdirectory(engine)
 add_subdirectory(tools/engine_console)

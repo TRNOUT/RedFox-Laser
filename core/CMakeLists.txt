@@ -1,0 +1,10 @@
+# Shared, hardware-independent core library: file formats (ILDA), the show
+# data model, and related logic used by both the engine and the UI.
+add_library(redfox_core STATIC
+    src/ilda/IldaCodec.cpp
+)
+target_include_directories(redfox_core PUBLIC src)
+
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
