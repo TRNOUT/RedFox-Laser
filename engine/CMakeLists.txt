@@ -2,6 +2,7 @@ add_library(redfox_engine_core STATIC
     src/safety/SafetySupervisor.cpp
     src/safety/SafetyEventLog.cpp
     src/output/LiberaLaserOutput.cpp
+    src/playback/FrameGenerator.cpp
     src/ipc/TelemetryHost.cpp
     src/ipc/TelemetryClient.cpp
     src/ipc/CommandPipeServer.cpp
@@ -9,7 +10,7 @@ add_library(redfox_engine_core STATIC
 )
 
 target_include_directories(redfox_engine_core PUBLIC src)
-target_link_libraries(redfox_engine_core PUBLIC libera-core)
+target_link_libraries(redfox_engine_core PUBLIC libera-core redfox_core)
 redfox_copy_bundled_libusb_dll(redfox_engine_core)
 
 if (WIN32)
