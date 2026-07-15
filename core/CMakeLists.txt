@@ -2,6 +2,7 @@
 # data model, and related logic used by both the engine and the UI.
 add_library(redfox_core STATIC
     src/ilda/IldaCodec.cpp
+    src/show/CuePlayback.cpp
 )
 target_include_directories(redfox_core PUBLIC src)
 
