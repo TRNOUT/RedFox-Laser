@@ -6,6 +6,7 @@ add_executable(redfox_core_tests
     test_midi.cpp
     test_show_file.cpp
     test_effects.cpp
+    test_audio.cpp
 )
 target_link_libraries(redfox_core_tests PRIVATE redfox_core Catch2::Catch2WithMain)
 
