@@ -24,4 +24,8 @@ struct ParseResult {
 // section, or the standard ILDA default palette).
 ParseResult readIlda(const std::vector<std::uint8_t>& bytes);
 
+// Convenience file wrappers around writeIlda/readIlda.
+bool writeIldaFile(const std::string& path, const IldaShow& show);
+ParseResult readIldaFile(const std::string& path);
+
 } // namespace redfox::ilda

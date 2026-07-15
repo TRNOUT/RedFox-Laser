@@ -1,6 +1,7 @@
 #include "ilda/IldaCodec.hpp"
 
 #include <cmath>
+#include <fstream>
 #include <string>
 #include <utility>
 
@@ -252,6 +253,30 @@ ParseResult readIlda(const std::vector<std::uint8_t>& bytes) {
 
     result.ok = true; // ended without an explicit EOF header; accept what we parsed
     return result;
+}
+
+bool writeIldaFile(const std::string& path, const IldaShow& show) {
+    std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        return false;
+    }
+    const std::vector<std::uint8_t> bytes = writeIlda(show);
+    file.write(reinterpret_cast<const char*>(bytes.data()),
+               static_cast<std::streamsize>(bytes.size()));
+    return static_cast<bool>(file);
+}
+
+ParseResult readIldaFile(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        ParseResult result;
+        result.ok = false;
+        result.error = "could not open file: " + path;
+        return result;
+    }
+    std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)),
+                                    std::istreambuf_iterator<char>());
+    return readIlda(bytes);
 }
 
 } // namespace redfox::ilda
