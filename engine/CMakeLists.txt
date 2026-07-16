@@ -17,6 +17,8 @@ add_library(redfox_engine_core STATIC
     src/safety/SafetySupervisor.cpp
     src/safety/SafetyEventLog.cpp
     src/output/LiberaLaserOutput.cpp
+    src/output/ArtNetPacket.cpp
+    src/output/ArtNetOutput.cpp
     src/playback/FrameGenerator.cpp
     src/playback/Sequencer.cpp
     src/midi/MidiInput.cpp

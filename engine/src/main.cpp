@@ -3,6 +3,7 @@
 #include "safety/SafetyEventLog.hpp"
 #include "output/LaserOutput.hpp"
 #include "output/MockLaserOutput.hpp"
+#include "output/ArtNetOutput.hpp"
 #include "playback/FrameGenerator.hpp"
 #include "playback/Sequencer.hpp"
 #include "show/DemoContent.hpp"
@@ -19,10 +20,13 @@
 
 #include <windows.h>
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <thread>
@@ -263,6 +267,25 @@ int main() {
         std::cout << "Audio: could not open a capture device." << std::endl;
     }
 
+    // Optional Art-Net DMX output. Off unless REDFOX_ARTNET_TARGET names a
+    // target IP, so the engine never emits unsolicited network traffic. When
+    // on, it streams a small DMX universe mirroring the live master/audio state
+    // (open protocol — no ShowNET licence needed for the DMX side).
+    redfox::output::ArtNetOutput artNet;
+    if (const char* artNetTarget = std::getenv("REDFOX_ARTNET_TARGET");
+        artNetTarget != nullptr && *artNetTarget != '\0') {
+        if (artNet.open(artNetTarget)) {
+            std::cout << "Art-Net: streaming DMX to " << artNetTarget
+                      << " (universe 0)." << std::endl;
+        } else {
+            std::cout << "Art-Net: could not open target \"" << artNetTarget << "\"."
+                      << std::endl;
+        }
+    } else {
+        std::cout << "Art-Net: disabled (set REDFOX_ARTNET_TARGET=<ip> to enable)."
+                  << std::endl;
+    }
+
     std::vector<redfox::output::OutputPoint> outputPoints;
     std::vector<redfox::ipc::PreviewPoint> previewPoints;
     std::uint64_t lastSeenUiHeartbeat = 0;
@@ -306,6 +329,22 @@ int main() {
 
         telemetry.engineHeartbeatEpochMs.store(nowEpochMs());
         telemetry.safetyState.store(static_cast<std::uint32_t>(supervisor.state()));
+
+        // Mirror the live master/audio state onto a small DMX universe (10 Hz).
+        if (artNet.isOpen()) {
+            const auto to255 = [](float v) {
+                return static_cast<std::uint8_t>(
+                    std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+            };
+            std::array<std::uint8_t, 6> dmx{};
+            dmx[0] = to255(telemetry.ctrlMasterBrightness.load(std::memory_order_relaxed));
+            dmx[1] = to255(telemetry.audioLevel.load(std::memory_order_relaxed));
+            dmx[2] = to255(telemetry.audioBass.load(std::memory_order_relaxed));
+            dmx[3] = to255(telemetry.audioMid.load(std::memory_order_relaxed));
+            dmx[4] = to255(telemetry.audioHigh.load(std::memory_order_relaxed));
+            dmx[5] = (supervisor.state() == redfox::safety::SafetyState::Armed) ? 255 : 0;
+            artNet.sendUniverse(0, 0, dmx.data(), static_cast<std::uint16_t>(dmx.size()));
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
