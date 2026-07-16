@@ -9,6 +9,7 @@ add_executable(redfox_core_tests
     test_audio.cpp
     test_timeline.cpp
     test_show_editing.cpp
+    test_motion_effects.cpp
 )
 target_link_libraries(redfox_core_tests PRIVATE redfox_core Catch2::Catch2WithMain)
 

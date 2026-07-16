@@ -9,6 +9,7 @@ add_library(redfox_core STATIC
     src/show/Timeline.cpp
     src/show/Transform.cpp
     src/effects/Oscillator.cpp
+    src/effects/MotionEffect.cpp
     src/audio/AudioAnalysis.cpp
     src/audio/BeatDetector.cpp
     src/midi/MidiParser.cpp
