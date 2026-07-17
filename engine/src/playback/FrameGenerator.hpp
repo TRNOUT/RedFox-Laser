@@ -26,6 +26,9 @@ public:
     void triggerCue(std::size_t cueIndex); // start playing a cue from now
     void stop();                           // clear the active cue
 
+    // Master tempo (BPM) that tempo-synced effects run at. Defaults to 120.
+    void setMasterBpm(float bpm);
+
     bool hasActiveCue() const;
 
     // Fill `out` with the active cue's current frame (ILDA points converted to
@@ -40,6 +43,7 @@ private:
     bool active_ = false;
     std::size_t cueIndex_ = 0;
     std::chrono::steady_clock::time_point startTime_{};
+    float masterBpm_ = 120.0f;
 };
 
 } // namespace redfox::engine

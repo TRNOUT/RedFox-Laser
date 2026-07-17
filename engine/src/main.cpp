@@ -301,6 +301,11 @@ int main() {
         supervisor.tick();
         sequencer.tick(); // auto-advance the timeline, triggering due cues
 
+        // Feed the UI's master tempo to the generator so tempo-synced effects
+        // track it live.
+        frameGenerator.setMasterBpm(
+            telemetry.ctrlMasterBpm.load(std::memory_order_relaxed));
+
         // While armed with an active cue, render its current frame to the
         // output and keep the frame-stall watchdog satisfied.
         bool produced = false;

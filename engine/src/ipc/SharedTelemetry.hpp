@@ -49,6 +49,7 @@ struct EngineTelemetry {
     std::atomic<float> ctrlMasterScale{1.0f};      // uniform geometry scale
     std::atomic<float> ctrlMasterRotationTurns{0.0f}; // static rotation, turns
     std::atomic<float> ctrlAudioAmount{0.3f};      // bass-pulse depth (0 = off)
+    std::atomic<float> ctrlMasterBpm{120.0f};      // master tempo for synced effects
 
     // Live preview of the current output frame, published with a seqlock: the
     // sequence is odd while the engine writes and even when stable, so the UI
@@ -98,7 +99,7 @@ inline std::size_t readPreview(const EngineTelemetry& t, PreviewPoint* out) {
     return 0;
 }
 
-inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v5";
+inline constexpr wchar_t kTelemetrySharedMemoryName[] = L"Local\\RedFoxLaser_Telemetry_v6";
 inline constexpr std::size_t kTelemetrySharedMemorySize = sizeof(EngineTelemetry);
 
 } // namespace redfox::ipc

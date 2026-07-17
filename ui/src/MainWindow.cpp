@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
+#include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -134,6 +135,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     scaleSlider_ = addSlider(controls, 1, "Scale", central, 200, 100);
     rotationSlider_ = addSlider(controls, 2, "Rotation", central, 100, 0);
     audioAmountSlider_ = addSlider(controls, 3, "Audio react", central, 100, 30);
+    controls->addWidget(new QLabel("Tempo (BPM)", central), 4, 0);
+    bpmSpin_ = new QSpinBox(central);
+    bpmSpin_->setRange(20, 300);
+    bpmSpin_->setValue(120);
+    bpmSpin_->setToolTip("Master tempo — effects set to “Sync to master BPM” run at this rate.");
+    controls->addWidget(bpmSpin_, 4, 1);
     layout->addLayout(controls);
 
     auto* editorButton = new QPushButton("Open Vector Editor", central);
@@ -189,6 +196,8 @@ void MainWindow::tick() {
                                           std::memory_order_relaxed);
         tel.ctrlAudioAmount.store(audioAmountSlider_->value() / 100.0f,
                                   std::memory_order_relaxed);
+        tel.ctrlMasterBpm.store(static_cast<float>(bpmSpin_->value()),
+                                std::memory_order_relaxed);
         const std::uint32_t state = telemetry_->telemetry().safetyState.load();
         stateLabel_->setText(QString("Safety state: ") + stateName(state));
         framesLabel_->setText(

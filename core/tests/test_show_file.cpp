@@ -21,6 +21,24 @@ show::Show makeSampleShow() {
     square.transform.offsetX = 0.1f;
     square.transform.scale = 0.5f;
     square.spinTurnsPerSec = 2.0f;
+    {
+        effects::Effect runner;
+        runner.type = effects::EffectType::Runner;
+        runner.direction = effects::Direction::PingPong;
+        runner.rateHz = 3.5f;
+        runner.amount = 0.2f;
+        runner.axis = 1;
+        runner.r = 0;
+        runner.g = 255;
+        runner.b = 128;
+        runner.enabled = false;
+        effects::Effect rot;
+        rot.type = effects::EffectType::Rotate;
+        rot.direction = effects::Direction::Reverse;
+        rot.rateHz = 1.25f;
+        rot.syncToTempo = true;
+        square.effects = {runner, rot};
+    }
     ilda::IldaFrame f;
     f.points = {
         {0.5f, 0.5f, 0.0f, 255, 0, 0, false},
@@ -64,6 +82,20 @@ TEST_CASE("a show round-trips through the binary format", "[show][file]") {
     REQUIRE(near(c0.transform.offsetX, 0.1f));
     REQUIRE(near(c0.transform.scale, 0.5f));
     REQUIRE(near(c0.spinTurnsPerSec, 2.0f));
+    REQUIRE(c0.effects.size() == 2);
+    REQUIRE(c0.effects[0].type == effects::EffectType::Runner);
+    REQUIRE(c0.effects[0].direction == effects::Direction::PingPong);
+    REQUIRE(near(c0.effects[0].rateHz, 3.5f));
+    REQUIRE(near(c0.effects[0].amount, 0.2f));
+    REQUIRE(c0.effects[0].axis == 1);
+    REQUIRE(c0.effects[0].g == 255);
+    REQUIRE(c0.effects[0].b == 128);
+    REQUIRE_FALSE(c0.effects[0].enabled);
+    REQUIRE_FALSE(c0.effects[0].syncToTempo);
+    REQUIRE(c0.effects[1].type == effects::EffectType::Rotate);
+    REQUIRE(c0.effects[1].direction == effects::Direction::Reverse);
+    REQUIRE(near(c0.effects[1].rateHz, 1.25f));
+    REQUIRE(c0.effects[1].syncToTempo);
     REQUIRE(c0.frames.size() == 1);
     REQUIRE(c0.frames[0].points.size() == 2);
     REQUIRE(c0.frames[0].points[0].r == 255);
@@ -75,6 +107,7 @@ TEST_CASE("a show round-trips through the binary format", "[show][file]") {
     REQUIRE(c1.loop);
     REQUIRE(c1.frames.size() == 2);
     REQUIRE(c1.frames[1].points[0].g == 50);
+    REQUIRE(c1.effects.empty());
 
     const show::Timeline& tl = parsed.show.timeline;
     REQUIRE(tl.name == "Main Sequence");

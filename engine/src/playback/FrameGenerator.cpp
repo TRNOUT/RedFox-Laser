@@ -1,5 +1,6 @@
 #include "playback/FrameGenerator.hpp"
 
+#include "effects/MotionEffect.hpp"
 #include "show/CuePlayback.hpp"
 #include "show/Transform.hpp"
 
@@ -30,6 +31,11 @@ void FrameGenerator::stop() {
     active_ = false;
 }
 
+void FrameGenerator::setMasterBpm(float bpm) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    masterBpm_ = bpm;
+}
+
 bool FrameGenerator::hasActiveCue() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return active_;
@@ -50,9 +56,27 @@ bool FrameGenerator::currentFrame(std::vector<output::OutputPoint>& out) const {
     const double elapsedSeconds =
         std::chrono::duration<double>(clock_.now() - startTime_).count();
     const std::size_t frameIndex = show::cueFrameIndexAt(cue, elapsedSeconds);
-    const ilda::IldaFrame& frame = cue.frames[frameIndex];
-    if (frame.points.empty()) {
+    const ilda::IldaFrame& sourceFrame = cue.frames[frameIndex];
+    if (sourceFrame.points.empty()) {
         return false;
+    }
+
+    // Motion effects animate a copy of the stored frame live from playback time,
+    // so a single frame moves without baking. They run before the base transform
+    // so effects work in the frame's own space; spin/offset then place the whole
+    // result on the scanner.
+    ilda::IldaFrame frame = sourceFrame;
+    if (!cue.effects.empty()) {
+        // Tempo-synced effects ignore their own rate and run at the master BPM
+        // (one cycle per beat); copy so the stored show is left untouched.
+        std::vector<effects::Effect> live = cue.effects;
+        const float tempoHz = masterBpm_ / 60.0f;
+        for (effects::Effect& e : live) {
+            if (e.syncToTempo) {
+                e.rateHz = tempoHz;
+            }
+        }
+        effects::applyEffects(frame, live, elapsedSeconds);
     }
 
     // Effective transform: the cue's base transform plus its time-driven spin.

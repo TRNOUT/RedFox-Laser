@@ -1,5 +1,6 @@
 #pragma once
 
+#include "effects/MotionEffect.hpp"
 #include "ilda/IldaTypes.hpp"
 #include "show/Timeline.hpp"
 #include "show/Transform.hpp"
@@ -21,6 +22,10 @@ struct Cue {
     // second) added to its rotation over playback time.
     Transform transform;
     float spinTurnsPerSec = 0.0f;
+
+    // Procedural motion effects evaluated live from playback time, in order.
+    // They animate a stored frame (rotate/wave/runner/strobe) without baking.
+    std::vector<effects::Effect> effects;
 };
 
 // A show is a collection of cues plus an optional timeline that sequences them

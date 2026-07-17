@@ -11,6 +11,7 @@
 
 class QLabel;
 class QSlider;
+class QSpinBox;
 class QTimer;
 class EditorWindow;
 class TimelineEditor;
@@ -48,6 +49,7 @@ private:
     QSlider* scaleSlider_ = nullptr;
     QSlider* rotationSlider_ = nullptr;
     QSlider* audioAmountSlider_ = nullptr;
+    QSpinBox* bpmSpin_ = nullptr; // master tempo for tempo-synced effects
     QTimer* timer_ = nullptr;
     EditorWindow* editor_ = nullptr;
     TimelineEditor* timelineEditor_ = nullptr;

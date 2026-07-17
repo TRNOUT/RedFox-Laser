@@ -11,10 +11,13 @@ namespace redfox::show {
 namespace {
 
 constexpr char kMagic[4] = {'R', 'F', 'S', 'H'};
-constexpr std::uint32_t kVersion = 3;
-// The lowest version this reader still understands. v2 shows have no timeline;
-// they load with an empty one.
+constexpr std::uint32_t kVersion = 5;
+// The lowest version this reader still understands. v2 shows have no timeline,
+// v3 shows have no per-cue effects, and v4 effects have no tempo-sync flag; each
+// older part loads with that field at its default.
 constexpr std::uint32_t kMinReadableVersion = 2;
+
+void putU8(std::vector<std::uint8_t>& out, std::uint8_t v) { out.push_back(v); }
 
 void putU32(std::vector<std::uint8_t>& out, std::uint32_t v) {
     out.push_back(static_cast<std::uint8_t>(v & 0xFF));
@@ -52,6 +55,17 @@ struct Reader {
     const std::uint8_t* p;
     std::size_t remaining;
     bool ok = true;
+
+    std::uint8_t u8() {
+        if (remaining < 1) {
+            ok = false;
+            return 0;
+        }
+        const std::uint8_t v = *p;
+        p += 1;
+        remaining -= 1;
+        return v;
+    }
 
     std::uint32_t u32() {
         if (remaining < 4) {
@@ -134,6 +148,21 @@ std::vector<std::uint8_t> writeShow(const Show& show) {
         putFloat(out, cue.transform.brightness);
         putFloat(out, cue.spinTurnsPerSec);
         putBytes(out, ilda::writeIlda(cue.frames));
+
+        // Per-cue motion effects (version 4+).
+        putU32(out, static_cast<std::uint32_t>(cue.effects.size()));
+        for (const effects::Effect& e : cue.effects) {
+            putU8(out, static_cast<std::uint8_t>(e.type));
+            putU8(out, static_cast<std::uint8_t>(e.direction));
+            putFloat(out, e.rateHz);
+            putFloat(out, e.amount);
+            putU8(out, e.axis);
+            putU8(out, e.r);
+            putU8(out, e.g);
+            putU8(out, e.b);
+            putU8(out, e.enabled ? 1 : 0);
+            putU8(out, e.syncToTempo ? 1 : 0); // version 5+
+        }
     }
 
     // Timeline block (version 3+).
@@ -191,6 +220,28 @@ ShowParseResult readShow(const std::vector<std::uint8_t>& bytes) {
             return result;
         }
         cue.frames = frames.frames;
+
+        // Per-cue motion effects: present from version 4 on; older cues have none.
+        if (version >= 4) {
+            const std::uint32_t effectCount = r.u32();
+            for (std::uint32_t e = 0; e < effectCount && r.ok; ++e) {
+                effects::Effect eff;
+                eff.type = static_cast<effects::EffectType>(r.u8());
+                eff.direction = static_cast<effects::Direction>(r.u8());
+                eff.rateHz = r.f32();
+                eff.amount = r.f32();
+                eff.axis = r.u8();
+                eff.r = r.u8();
+                eff.g = r.u8();
+                eff.b = r.u8();
+                eff.enabled = (r.u8() != 0);
+                if (version >= 5) {
+                    eff.syncToTempo = (r.u8() != 0);
+                }
+                cue.effects.push_back(eff);
+            }
+        }
+
         result.show.cues.push_back(std::move(cue));
     }
 
